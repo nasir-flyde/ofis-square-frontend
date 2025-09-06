@@ -1,0 +1,40 @@
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #0b1020; color: #e6e9ef; }
+
+.container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 16px 24px; background: #121935; border-bottom: 1px solid #2a335a; position: sticky; top: 0; z-index: 10; }
+.brand { font-weight: 700; letter-spacing: 0.2px; }
+.top-actions { display: flex; gap: 12px; align-items: center; }
+.baseurl { background: #0f152c; color: #e6e9ef; border: 1px solid #2a335a; padding: 8px 10px; border-radius: 6px; width: 320px; }
+.user { font-size: 14px; opacity: 0.85; }
+button { background: #4f46e5; color: white; border: none; padding: 10px 14px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+button:hover { background: #635bff; }
+button:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.card { background: #111936; border: 1px solid #2a335a; border-radius: 12px; margin: 20px 0; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+.card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid #2a335a; }
+.card-header h2 { margin: 0; font-size: 18px; }
+.card-body { padding: 18px 20px; }
+
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 16px; }
+.form-grid .field { display: flex; flex-direction: column; gap: 6px; }
+.form-grid .field.full { grid-column: 1 / -1; }
+label { font-size: 12px; color: #b6bed1; }
+input[type="text"], input[type="email"], input[type="password"], input[type="tel"], input[type="file"] { background: #0f152c; border: 1px solid #2a335a; color: #e6e9ef; padding: 10px 12px; border-radius: 8px; }
+.actions { grid-column: 1 / -1; display: flex; gap: 10px; }
+.error { margin-top: 8px; color: #ff7b7b; font-size: 14px; }
+
+.table { width: 100%; border-collapse: collapse; }
+.table th, .table td { text-align: left; border-bottom: 1px solid #2a335a; padding: 10px 8px; font-size: 14px; }
+.table th { color: #b6bed1; font-weight: 600; }
+.row-actions { display: flex; gap: 10px; align-items: center; }
+
+.badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+.badge-none { background: #2a335a; color: #c7d0e6; }
+.badge-pending { background: #9a6cff1f; color: #c6b9ff; border: 1px solid #6c5ce7; }
+.badge-verified { background: #2e7d321a; color: #a3e3a8; border: 1px solid #2e7d32; }
+.badge-rejected { background: #8b1d1d1a; color: #ffb3b3; border: 1px solid #8b1d1d; }
+
+.upload-btn { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; border: 1px dashed #6b7280; background: transparent; color: #e6e9ef; padding: 8px 12px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.upload-btn input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
