@@ -6,7 +6,7 @@ import { useApi } from "../../hooks/useApi";
 
 export function AuthPage() {
   const navigate = useNavigate();
-  const { client: api, saveToken } = useApi("http://localhost:5001");
+  const { client: api, saveToken } = useApi();
   const [formData, setFormData] = useState({
     email: "",
     password: "",

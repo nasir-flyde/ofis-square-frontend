@@ -28,7 +28,7 @@ export function BuildingsPage() {
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
 
   const fetchBuildings = async () => {
     try {

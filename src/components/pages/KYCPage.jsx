@@ -6,7 +6,7 @@ import { useApi } from "../../hooks/useApi";
 
 export function KYCPage() {
   const navigate = useNavigate();
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
   const [selectedDocuments, setSelectedDocuments] = useState([]);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");

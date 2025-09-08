@@ -8,7 +8,7 @@ import { useApi } from "../../hooks/useApi";
 
 export function ContractPage() {
   const navigate = useNavigate();
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
   const [contractStatus, setContractStatus] = useState("form"); // form, pending, sent, signed, declined
   const [formData, setFormData] = useState({
     buildingId: "",

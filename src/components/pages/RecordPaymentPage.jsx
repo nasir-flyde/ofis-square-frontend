@@ -8,7 +8,7 @@ import { useApi } from "../../hooks/useApi";
 export function RecordPaymentPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
   
   const [formData, setFormData] = useState({
     invoice: searchParams.get('invoice') || '',

@@ -21,7 +21,9 @@ export function Header({ user, onLogout, baseUrl, onBaseUrlChange }) {
                 value={baseUrl}
                 onChange={(e) => onBaseUrlChange(e.target.value)}
                 className="px-3 py-1 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                placeholder="http://localhost:5001"
+                // placeholder="http://localhost:5001"
+                placeholder="https://ofis-square-backend.onrender.com"
+
               />
             </div>
             

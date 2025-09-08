@@ -8,7 +8,7 @@ import { useApi } from "../../hooks/useApi";
 export function UploadSignedContractPage() {
   const navigate = useNavigate();
   const { contractId } = useParams();
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
   
   const [contract, setContract] = useState(null);
   const [file, setFile] = useState(null);

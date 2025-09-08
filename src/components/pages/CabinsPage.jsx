@@ -25,7 +25,7 @@ export function CabinsPage() {
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
 
   const fetchCabins = async () => {
     try {

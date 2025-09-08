@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import axios from "axios";
 
-export function useApi(baseUrl) {
+export function useApi(baseUrl = "https://ofis-square-backend.onrender.com") {
   const [token, setToken] = useState(localStorage.getItem("ofis_admin_token") || "");
 
   const client = useMemo(() => {

@@ -7,7 +7,7 @@ import { useApi } from "../../hooks/useApi";
 
 export function AllocationPage() {
   const navigate = useNavigate();
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
   const [selectedCabin, setSelectedCabin] = useState(null);
   const [cabins, setCabins] = useState([]);
   const [loading, setLoading] = useState(true);

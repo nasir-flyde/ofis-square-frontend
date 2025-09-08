@@ -13,7 +13,7 @@ export function ClientsPage() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
 
   // Details modal tab state and data
   const [activeTab, setActiveTab] = useState("overview");

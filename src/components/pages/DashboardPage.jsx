@@ -7,7 +7,7 @@ import { useApi } from "../../hooks/useApi";
 
 export function DashboardPage() {
   const navigate = useNavigate();
-  const { client: api } = useApi("http://localhost:5001");
+  const { client: api } = useApi();
   const [clientData, setClientData] = useState(null);
   const [contracts, setContracts] = useState([]);
   const [invoices, setInvoices] = useState([]);

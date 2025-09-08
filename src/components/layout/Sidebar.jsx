@@ -18,7 +18,7 @@ import {
 export function Sidebar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { saveToken } = useApi("http://localhost:5001");
+  const { saveToken } = useApi();
 
   const handleLogout = () => {
     // Clear auth token and user info
