@@ -77,6 +77,16 @@ export function ContractsPage() {
     }
   };
 
+  // Auto-calculate monthly rent when capacity or building changes
+  const calculateMonthlyRent = (capacity, buildingId) => {
+    if (!capacity || !buildingId) return '';
+    
+    const selectedBuilding = buildings.find(b => b._id === buildingId);
+    if (!selectedBuilding || !selectedBuilding.pricing) return '';
+    
+    return (parseInt(capacity) * selectedBuilding.pricing).toString();
+  };
+
   useEffect(() => {
     fetchContracts();
     fetchClients();
@@ -144,6 +154,23 @@ export function ContractsPage() {
     setSelectedContract(contract);
     setModalMode("edit");
     setShowModal(true);
+  };
+
+  const handleFormDataChange = (updates) => {
+    const newFormData = { ...formData, ...updates };
+    
+    // Auto-calculate monthly rent if capacity or building changes
+    if (updates.capacity !== undefined || updates.building !== undefined) {
+      const calculatedRent = calculateMonthlyRent(
+        updates.capacity !== undefined ? updates.capacity : formData.capacity,
+        updates.building !== undefined ? updates.building : formData.building
+      );
+      if (calculatedRent) {
+        newFormData.monthlyRent = calculatedRent;
+      }
+    }
+    
+    setFormData(newFormData);
   };
 
   const handleView = (contract) => {
@@ -512,7 +539,7 @@ export function ContractsPage() {
           modalMode={modalMode}
           selectedContract={selectedContract}
           formData={formData}
-          setFormData={setFormData}
+          setFormData={handleFormDataChange}
           formErrors={formErrors}
           clients={clients}
           buildings={buildings}

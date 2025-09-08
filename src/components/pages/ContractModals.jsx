@@ -210,9 +210,10 @@ export function ContractModal({
                     type="number"
                     value={formData.monthlyRent}
                     onChange={(e) => setFormData({ ...formData, monthlyRent: e.target.value })}
-                    placeholder="Monthly rent amount"
+                    placeholder="Will be calculated automatically"
                     min="0"
-                    className={formErrors.monthlyRent ? "border-red-300" : ""}
+                    className={`${formErrors.monthlyRent ? "border-red-300" : ""} ${formData.monthlyRent ? "bg-blue-50" : ""}`}
+                    readOnly={!!formData.monthlyRent}
                   />
                   {formErrors.monthlyRent && (
                     <p className="text-sm text-red-600 mt-1">{formErrors.monthlyRent}</p>
