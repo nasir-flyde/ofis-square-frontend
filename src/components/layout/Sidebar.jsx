@@ -56,12 +56,7 @@ export function Sidebar() {
       icon: <Calendar size={20} />, 
       path: "/meeting-rooms" 
     },
-    { 
-      id: "users", 
-      label: "Users", 
-      icon: <User size={20} />, 
-      path: "/users" 
-    },
+
     { 
       id: "buildings", 
       label: "Buildings", 
@@ -85,6 +80,12 @@ export function Sidebar() {
       label: "Tickets", 
       icon: <Ticket size={20} />, 
       path: "/tickets" 
+    },
+    { 
+      id: "users", 
+      label: "Users", 
+      icon: <User size={20} />, 
+      path: "/users" 
     },
     { 
       id: "settings", 
