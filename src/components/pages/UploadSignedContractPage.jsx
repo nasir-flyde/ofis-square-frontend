@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Input, Textarea } from "../ui/Input";
@@ -8,6 +8,8 @@ import { useApi } from "../../hooks/useApi";
 export function UploadSignedContractPage() {
   const navigate = useNavigate();
   const { contractId } = useParams();
+  const location = useLocation();
+  const fromContracts = Boolean(location.state?.fromContracts);
   const { client: api } = useApi();
   
   const [contract, setContract] = useState(null);
@@ -90,9 +92,13 @@ export function UploadSignedContractPage() {
         },
       });
       
-      // Success - redirect to allocation page
+      // Success - conditional redirect based on entry point
       alert('Signed contract uploaded successfully! Contract is now active.');
-      navigate('/allocation');
+      if (fromContracts) {
+        navigate('/contracts');
+      } else {
+        navigate('/allocation');
+      }
     } catch (error) {
       setError(error.response?.data?.error || 'Failed to upload signed contract');
     } finally {
@@ -261,7 +267,7 @@ export function UploadSignedContractPage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => navigate('/admin/contracts')}
+                  onClick={() => navigate(fromContracts ? '/contracts' : '/allocation')}
                 >
                   Cancel
                 </Button>

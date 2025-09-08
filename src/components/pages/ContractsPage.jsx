@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Badge } from "../ui/Badge";
 import { useApi } from "../../hooks/useApi";
 import { ContractModal } from "./ContractModals";
-import { FileText, Download, Send, Eye, Edit, Trash2, Building, User, Calendar, IndianRupee } from "lucide-react";
+import { FileText, Download, Eye, Edit, Trash2, Building, User, Calendar, IndianRupee, Upload } from "lucide-react";
 
 export function ContractsPage() {
   const [contracts, setContracts] = useState([]);
@@ -29,11 +30,14 @@ export function ContractsPage() {
     contractStartDate: "",
     contractEndDate: "",
     terms: "",
+    signedFileUrl: "",
+    signedFile: null,
     status: "draft"
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const { client: api } = useApi();
+  const navigate = useNavigate();
 
   const fetchContracts = async () => {
     try {
@@ -125,6 +129,8 @@ export function ContractsPage() {
       contractStartDate: "",
       contractEndDate: "",
       terms: "",
+      signedFileUrl: "",
+      signedFile: null,
       status: "draft"
     });
     setFormErrors({});
@@ -149,6 +155,8 @@ export function ContractsPage() {
       contractStartDate: contract.startDate ? new Date(contract.startDate).toISOString().split('T')[0] : "",
       contractEndDate: contract.endDate ? new Date(contract.endDate).toISOString().split('T')[0] : "",
       terms: contract.terms || "",
+      signedFileUrl: "",
+      signedFile: null,
       status: contract.status || "draft"
     });
     setSelectedContract(contract);
@@ -253,6 +261,24 @@ export function ContractsPage() {
       }
 
       if (response.data.success || response.data.message) {
+        // If editing and a new signed file (preferred) or URL is provided, upload it
+        if (modalMode === "edit" && (formData.signedFile || (formData.signedFileUrl && formData.signedFileUrl !== selectedContract?.fileUrl))) {
+          try {
+            const fd = new FormData();
+            if (formData.signedFile) {
+              fd.append('file', formData.signedFile);
+            } else if (formData.signedFileUrl) {
+              fd.append('fileUrl', formData.signedFileUrl);
+            }
+            await api.post(`/api/contracts/${selectedContract._id}/upload-signed`, fd, {
+              headers: { 'Content-Type': 'multipart/form-data' }
+            });
+          } catch (uploadErr) {
+            console.error("Error replacing signed contract:", uploadErr);
+            // Surface a non-blocking message
+            alert(uploadErr.response?.data?.error || 'Failed to replace signed contract');
+          }
+        }
         await fetchContracts();
         handleCloseModal();
       } else {
@@ -287,26 +313,7 @@ export function ContractsPage() {
     }
   };
 
-  const handleSendForSignature = async (contract) => {
-    if (!window.confirm(`Send contract for "${contract.client?.companyName}" for digital signature?`)) {
-      return;
-    }
-
-    try {
-      setError(null);
-      const response = await api.post(`/api/contracts/${contract._id}/send-for-signature`);
-      
-      if (response.data.success || response.data.message) {
-        await fetchContracts();
-        alert("Contract sent for digital signature successfully!");
-      } else {
-        setError(response.data.message || "Failed to send contract for signature");
-      }
-    } catch (err) {
-      console.error("Error sending contract for signature:", err);
-      setError(err.response?.data?.message || "Failed to send contract for signature");
-    }
-  };
+  // Removed digital signature flow from UI. Using manual upload of signed contracts instead.
 
   const handleDelete = async (contract) => {
     if (!window.confirm(`Are you sure you want to delete the contract for "${contract.client?.companyName}"? This action cannot be undone.`)) {
@@ -489,15 +496,16 @@ export function ContractsPage() {
                       >
                         <Download size={14} />
                       </Button>
-                      {contract.status === 'draft' && (
+                      {(contract.status === 'draft' || contract.status === 'pending_signature') && (
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => handleSendForSignature(contract)}
+                          onClick={() => navigate(`/upload-signed-contract/${contract._id}`, { state: { fromContracts: true } })}
                           className="mr-2"
+                          title="Upload Signed Contract"
                         >
-                          <Send size={14} className="mr-1" />
-                          Send for Signature
+                          <Upload size={14} className="mr-1" />
+                          Upload Signed
                         </Button>
                       )}
                       <Button

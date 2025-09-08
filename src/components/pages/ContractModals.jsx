@@ -128,7 +128,21 @@ export function ContractModal({
               {selectedContract?.terms && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">Terms & Conditions</label>
-                  <p className="text-gray-900 mt-1 whitespace-pre-wrap">{selectedContract.terms}</p>
+                  <p className="text-gray-900 whitespace-pre-wrap">{selectedContract.terms}</p>
+                </div>
+              )}
+
+              {selectedContract?.fileUrl && (
+                <div>
+                  <label className="text-sm font-medium text-gray-500">Signed Contract File</label>
+                  <a
+                    href={selectedContract.fileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:underline break-all"
+                  >
+                    {selectedContract.fileUrl}
+                  </a>
                 </div>
               )}
             </div>
@@ -233,6 +247,43 @@ export function ContractModal({
                   />
                 </div>
               </div>
+
+              {modalMode === "edit" && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Current Signed File
+                    </label>
+                    {selectedContract?.fileUrl ? (
+                      <a
+                        href={selectedContract.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-blue-600 hover:underline break-all"
+                      >
+                        {selectedContract.fileUrl}
+                      </a>
+                    ) : (
+                      <p className="text-gray-500">No signed file uploaded yet</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Or Upload Signed File (PDF/PNG/JPG)
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files && e.target.files[0] ? e.target.files[0] : null;
+                        setFormData({ ...formData, signedFile: file });
+                      }}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                    />
+                    <p className="text-xs text-gray-500 mt-1">If you upload a file, it will be used instead of the URL.</p>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
