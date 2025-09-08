@@ -14,6 +14,10 @@ import { CompanyDetailsPage } from "./components/pages/CompanyDetailsPage";
 import { ClientsPage } from "./components/pages/ClientsPage";
 import { BuildingsPage } from "./components/pages/BuildingsPage";
 import { CabinsPage } from "./components/pages/CabinsPage";
+import { MeetingRoomsPage } from "./components/pages/MeetingRoomsPage";
+import { ContractsPage } from "./components/pages/ContractsPage";
+import { InvoicesPage } from "./components/pages/InvoicesPage";
+import { TicketsPage } from "./components/pages/TicketsPage";
 import { MainLayout } from "./components/layout/MainLayout";
 
 function App() {
@@ -22,6 +26,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/auth" replace />} />
         <Route path="/auth" element={<AuthPage />} />
+        
+        {/* Routes without sidebar layout */}
         
         {/* Routes with sidebar layout */}
         <Route path="/dashboard" element={
@@ -46,10 +52,7 @@ function App() {
         } />
         <Route path="/meeting-rooms" element={
           <MainLayout>
-            <div className="p-6">
-              <h1 className="text-2xl font-bold">Meeting Rooms</h1>
-              <p className="text-gray-600">Manage your meeting rooms here</p>
-            </div>
+            <MeetingRoomsPage />
           </MainLayout>
         } />
         <Route path="/users" element={
@@ -67,15 +70,22 @@ function App() {
         } />
         <Route path="/invoices" element={
           <MainLayout>
+            <InvoicesPage />
+          </MainLayout>
+        } />
+        <Route path="/create-invoice" element={
+          <MainLayout>
             <CreateInvoicePage />
+          </MainLayout>
+        } />
+        <Route path="/tickets" element={
+          <MainLayout>
+            <TicketsPage />
           </MainLayout>
         } />
         <Route path="/contracts" element={
           <MainLayout>
-            <div className="p-6">
-              <h1 className="text-2xl font-bold">Contracts</h1>
-              <p className="text-gray-600">Manage your contracts here</p>
-            </div>
+            <ContractsPage />
           </MainLayout>
         } />
         <Route path="/reports" element={

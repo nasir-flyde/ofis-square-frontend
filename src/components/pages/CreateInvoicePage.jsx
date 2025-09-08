@@ -184,9 +184,9 @@ export function CreateInvoicePage() {
 
       const { data } = await api.post('/api/invoices', payload);
       
-      // Success - redirect to payment record page with invoice ID
+      // Success - redirect back to invoices list
       alert('Invoice created successfully!');
-      navigate(`/record-payment?invoice=${data.data._id}`);
+      navigate('/invoices');
     } catch (error) {
       setErrors({ 
         general: error.response?.data?.message || 'Failed to create invoice. Please try again.' 
@@ -445,9 +445,9 @@ export function CreateInvoicePage() {
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => navigate('/allocation')}
+                  onClick={() => navigate('/invoices')}
                 >
-                  Back
+                  Back to Invoices
                 </Button>
                 <Button
                   type="submit"

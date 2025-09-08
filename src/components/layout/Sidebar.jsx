@@ -12,7 +12,8 @@ import {
   Settings, 
   LogOut,
   FileSignature,
-  BarChart3
+  BarChart3,
+  Ticket
 } from "lucide-react";
 
 export function Sidebar() {
@@ -78,6 +79,12 @@ export function Sidebar() {
       label: "Contracts", 
       icon: <FileSignature size={20} />, 
       path: "/contracts" 
+    },
+    { 
+      id: "tickets", 
+      label: "Tickets", 
+      icon: <Ticket size={20} />, 
+      path: "/tickets" 
     },
     { 
       id: "settings", 
