@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
@@ -6,6 +7,7 @@ import { Badge } from "../ui/Badge";
 import { useApi } from "../../hooks/useApi";
 
 export function ClientsPage() {
+  const navigate = useNavigate();
   const [clients, setClients] = useState([]);
   const [filteredClients, setFilteredClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -311,7 +313,7 @@ export function ClientsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="primary">
+          <Button variant="primary" onClick={() => navigate('/dashboard')}>
             Add New Client
           </Button>
         </div>
