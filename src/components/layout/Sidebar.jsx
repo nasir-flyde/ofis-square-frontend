@@ -13,7 +13,9 @@ import {
   LogOut,
   FileSignature,
   BarChart3,
-  Ticket
+  Ticket,
+  CreditCard,
+  QrCode
 } from "lucide-react";
 
 export function Sidebar() {
@@ -38,6 +40,13 @@ export function Sidebar() {
       icon: <Home size={20} />, 
       path: "/dashboard" 
     },
+    { 
+      id: "reception", 
+      label: "Reception", 
+      icon: <QrCode size={20} />, 
+      path: "/visitors/reception" 
+    },
+
     { 
       id: "clients", 
       label: "Clients", 
@@ -68,6 +77,12 @@ export function Sidebar() {
       label: "Invoices", 
       icon: <FileText size={20} />, 
       path: "/invoices" 
+    },
+    { 
+      id: "payments", 
+      label: "Payments", 
+      icon: <CreditCard size={20} />, 
+      path: "/payments" 
     },
     { 
       id: "contracts", 
@@ -118,10 +133,10 @@ export function Sidebar() {
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <div className="flex items-center space-x-3">
-          <img
-            src="/ofis-logo.svg"
-            alt="OFIS SQUARE"
-            className="w-8 h-8 object-contain"
+          <img 
+            src="https://cdn-ildohoj.nitrocdn.com/AHrVgCXyQAsLJyFSAzWCDlVPIrrckAMO/assets/images/optimized/rev-f2f5723/ofissquare.com/wp-content/uploads/2025/02/logo-2-300x46.png" 
+            alt="Ofis Square" 
+            className="h-8 w-auto object-contain"
             onError={(e) => {
               // Graceful fallback to colored square if image not found
               e.currentTarget.style.display = 'none';
@@ -130,7 +145,6 @@ export function Sidebar() {
             }}
           />
           <div id="sidebar-logo-fallback" className="hidden w-8 h-8 bg-gray-800 rounded" />
-          <span className="font-semibold text-gray-900">OFIS SQUARE</span>
         </div>
       </div>
 

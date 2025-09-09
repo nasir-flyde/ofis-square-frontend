@@ -70,7 +70,11 @@ export function AuthPage() {
         <div className="absolute bottom-0 left-0 w-80 h-80 border-2 border-gray-200 rounded-full -translate-x-24 translate-y-24"></div>
         
         <div className="relative z-10">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">OFIS SQUARE</h1>
+          <img 
+            src="https://cdn-ildohoj.nitrocdn.com/AHrVgCXyQAsLJyFSAzWCDlVPIrrckAMO/assets/images/optimized/rev-f2f5723/ofissquare.com/wp-content/uploads/2025/02/logo-2-300x46.png" 
+            alt="Ofis Square" 
+            className="mb-4 h-12"
+          />
           <p className="text-xl text-gray-600 mb-8">Workspaces that work wonders Space</p>
           <button className="bg-blue-600 text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 transition-colors">
             Read More

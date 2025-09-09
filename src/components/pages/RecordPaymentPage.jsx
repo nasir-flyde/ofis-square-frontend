@@ -40,7 +40,13 @@ export function RecordPaymentPage() {
 
   const fetchInvoices = async () => {
     try {
-      const { data } = await api.get('/api/invoices?status=issued');
+      const clientId = localStorage.getItem("ofis_current_client_id");
+      if (!clientId) {
+        console.error('No client ID found');
+        return;
+      }
+      
+      const { data } = await api.get(`/api/invoices?status=issued&client=${clientId}`);
       setInvoices(data.data || []);
     } catch (error) {
       console.error('Failed to fetch invoices:', error);

@@ -28,6 +28,7 @@ export function TicketsPage() {
   const [filteredTickets, setFilteredTickets] = useState([]);
   const [buildings, setBuildings] = useState([]);
   const [users, setUsers] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [showModal, setShowModal] = useState(false);
@@ -86,12 +87,24 @@ export function TicketsPage() {
 
   const fetchUsers = async () => {
     try {
-      const response = await api.get("/api/users");
+      const response = await api.get("/api/users/staff");
       if (response.data.success) {
         setUsers(response.data.data);
       }
     } catch (err) {
       console.error("Error fetching users:", err);
+    }
+  };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await api.get("/api/ticket-categories");
+      // Controller returns plain array
+      if (Array.isArray(response.data)) {
+        setCategories(response.data);
+      }
+    } catch (err) {
+      console.error("Error fetching ticket categories:", err);
     }
   };
 
@@ -109,6 +122,7 @@ export function TicketsPage() {
     fetchBuildings();
     fetchUsers();
     fetchStats();
+    fetchCategories();
   }, []);
 
   useEffect(() => {
@@ -498,6 +512,16 @@ export function TicketsPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
+                      <label className="block text-sm font-medium text-gray-700">Category</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedTicket?.category?.categoryId?.name || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Subcategory</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedTicket?.category?.subCategory || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
                       <label className="block text-sm font-medium text-gray-700">Priority</label>
                       <div className="mt-1">{getPriorityBadge(selectedTicket?.priority)}</div>
                     </div>
@@ -595,6 +619,53 @@ export function TicketsPage() {
                         <option value="resolved">Resolved</option>
                         <option value="closed">Closed</option>
                         <option value="pending">Pending</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Category</label>
+                      <select
+                        value={ticketData.category.categoryId}
+                        onChange={(e) => {
+                          const categoryId = e.target.value;
+                          setTicketData(prev => ({
+                            ...prev,
+                            category: {
+                              categoryId,
+                              // Reset subcategory when category changes
+                              subCategory: "",
+                            },
+                          }));
+                        }}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="">Select Category</option>
+                        {categories.map((cat) => (
+                          <option key={cat._id} value={cat._id}>{cat.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Subcategory</label>
+                      <select
+                        value={ticketData.category.subCategory}
+                        onChange={(e) => setTicketData(prev => ({
+                          ...prev,
+                          category: {
+                            ...prev.category,
+                            subCategory: e.target.value,
+                          },
+                        }))}
+                        disabled={!ticketData.category.categoryId}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
+                      >
+                        <option value="">{!ticketData.category.categoryId ? "Select category first" : "Select Subcategory"}</option>
+                        {(categories.find(c => c._id === ticketData.category.categoryId)?.subCategories || []).map((sub) => (
+                          <option key={sub} value={sub}>{sub}</option>
+                        ))}
                       </select>
                     </div>
                   </div>

@@ -18,7 +18,11 @@ import { MeetingRoomsPage } from "./components/pages/MeetingRoomsPage";
 import { ContractsPage } from "./components/pages/ContractsPage";
 import { InvoicesPage } from "./components/pages/InvoicesPage";
 import { TicketsPage } from "./components/pages/TicketsPage";
+import { UsersPage } from "./components/pages/UsersPage";
+import { PaymentsPage } from "./components/pages/PaymentsPage";
 import { MainLayout } from "./components/layout/MainLayout";
+import ReceptionDashboard from "./components/pages/ReceptionDashboard";
+import InviteVisitor from "./components/pages/InviteVisitor";
 
 function App() {
   return (
@@ -57,10 +61,7 @@ function App() {
         } />
         <Route path="/users" element={
           <MainLayout>
-            <div className="p-6">
-              <h1 className="text-2xl font-bold">Users</h1>
-              <p className="text-gray-600">Manage your users here</p>
-            </div>
+            <UsersPage />
           </MainLayout>
         } />
         <Route path="/buildings" element={
@@ -71,6 +72,21 @@ function App() {
         <Route path="/invoices" element={
           <MainLayout>
             <InvoicesPage />
+          </MainLayout>
+        } />
+        <Route path="/payments" element={
+          <MainLayout>
+            <PaymentsPage />
+          </MainLayout>
+        } />
+        <Route path="/visitors/reception" element={
+          <MainLayout>
+            <ReceptionDashboard />
+          </MainLayout>
+        } />
+        <Route path="/visitors/invite" element={
+          <MainLayout>
+            <InviteVisitor />
           </MainLayout>
         } />
         <Route path="/create-invoice" element={
