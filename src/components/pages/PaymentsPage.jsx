@@ -16,21 +16,32 @@ import {
   Calendar,
   DollarSign,
   Building,
-  X
+  X,
+  Check,
+  XCircle,
+  Clock,
+  MessageSquare,
+  Upload,
+  Image
 } from "lucide-react";
 
 export function PaymentsPage() {
   const [payments, setPayments] = useState([]);
   const [filteredPayments, setFilteredPayments] = useState([]);
+  const [draftPayments, setDraftPayments] = useState([]);
+  const [filteredDrafts, setFilteredDrafts] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedPayment, setSelectedPayment] = useState(null);
+  const [selectedDraft, setSelectedDraft] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState("view"); // view, create, edit
+  const [modalMode, setModalMode] = useState("view"); // view, create, edit, draft, approve, reject
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ totalAmount: 0, totalPayments: 0, thisMonth: 0 });
+  const [activeTab, setActiveTab] = useState("payments"); // payments, drafts
+  const [reviewNote, setReviewNote] = useState("");
   
   const [paymentData, setPaymentData] = useState({
     invoice: "",
@@ -43,11 +54,13 @@ export function PaymentsPage() {
     currency: "INR",
     notes: "",
     bankName: "",
-    accountNumber: ""
+    accountNumber: "",
+    screenshots: []
   });
 
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const { client: api } = useApi();
 
@@ -78,6 +91,18 @@ export function PaymentsPage() {
       setError(err.response?.data?.message || "Failed to fetch payments");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchDraftPayments = async () => {
+    try {
+      const response = await api.get("/api/draft-payments");
+      if (response.data.success) {
+        setDraftPayments(response.data.data);
+        setFilteredDrafts(response.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching draft payments:", err);
     }
   };
 
@@ -121,19 +146,31 @@ export function PaymentsPage() {
 
   useEffect(() => {
     fetchPayments();
+    fetchDraftPayments();
     fetchInvoices();
     fetchClients();
   }, []);
 
   useEffect(() => {
-    const filtered = payments.filter(payment =>
-      payment.invoice?.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.client?.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      payment.type?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredPayments(filtered);
-  }, [searchTerm, payments]);
+    if (activeTab === "payments") {
+      const filtered = payments.filter(payment =>
+        payment.invoice?.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payment.client?.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payment.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payment.type?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredPayments(filtered);
+    } else {
+      const filtered = draftPayments.filter(draft =>
+        draft.invoice?.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        draft.client?.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        draft.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        draft.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        draft.status?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredDrafts(filtered);
+    }
+  }, [searchTerm, payments, draftPayments, activeTab]);
 
   const resetForm = () => {
     setPaymentData({
@@ -157,6 +194,74 @@ export function PaymentsPage() {
     resetForm();
     setModalMode("create");
     setShowModal(true);
+  };
+
+  const handleCreateDraft = () => {
+    resetForm();
+    setModalMode("draft");
+    setShowModal(true);
+  };
+
+  const handleApproveDraft = (draft) => {
+    setSelectedDraft(draft);
+    setModalMode("approve");
+    setReviewNote("");
+    setShowModal(true);
+  };
+
+  const handleRejectDraft = (draft) => {
+    setSelectedDraft(draft);
+    setModalMode("reject");
+    setReviewNote("");
+    setShowModal(true);
+  };
+
+  const handleViewDraft = (draft) => {
+    setSelectedDraft(draft);
+    setModalMode("viewDraft");
+    setShowModal(true);
+  };
+
+  const submitApproval = async () => {
+    try {
+      setSubmitting(true);
+      await api.post(`/api/draft-payments/${selectedDraft._id}/approve`, {
+        reviewNote: reviewNote || undefined
+      });
+      await fetchDraftPayments();
+      await fetchPayments();
+      setShowModal(false);
+      setSelectedDraft(null);
+      setReviewNote("");
+    } catch (err) {
+      console.error("Error approving draft:", err);
+      setError(err.response?.data?.message || "Failed to approve draft");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const submitRejection = async () => {
+    if (!reviewNote.trim()) {
+      setError("Review note is required for rejection");
+      return;
+    }
+    
+    try {
+      setSubmitting(true);
+      await api.post(`/api/draft-payments/${selectedDraft._id}/reject`, {
+        reviewNote: reviewNote
+      });
+      await fetchDraftPayments();
+      setShowModal(false);
+      setSelectedDraft(null);
+      setReviewNote("");
+    } catch (err) {
+      console.error("Error rejecting draft:", err);
+      setError(err.response?.data?.message || "Failed to reject draft");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleEdit = (payment) => {
@@ -228,6 +333,56 @@ export function PaymentsPage() {
     }
   };
 
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const maxFiles = 5;
+    const maxSize = 5 * 1024 * 1024; // 5MB
+    
+    if (uploadedFiles.length + files.length > maxFiles) {
+      setError(`Maximum ${maxFiles} files allowed`);
+      return;
+    }
+    
+    const validFiles = files.filter(file => {
+      if (file.size > maxSize) {
+        setError(`File ${file.name} is too large. Maximum size is 5MB`);
+        return false;
+      }
+      if (!file.type.startsWith('image/')) {
+        setError(`File ${file.name} is not an image`);
+        return false;
+      }
+      return true;
+    });
+    
+    // Convert files to base64 for preview and storage
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const fileData = {
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          data: e.target.result // base64 data
+        };
+        setUploadedFiles(prev => [...prev, fileData]);
+        setPaymentData(prev => ({
+          ...prev,
+          screenshots: [...prev.screenshots, e.target.result]
+        }));
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeFile = (index) => {
+    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    setPaymentData(prev => ({
+      ...prev,
+      screenshots: prev.screenshots.filter((_, i) => i !== index)
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     
@@ -249,6 +404,16 @@ export function PaymentsPage() {
         const response = await api.put(`/api/payments/${selectedPayment._id}`, payload);
         if (response.data.success) {
           setPayments(prev => prev.map(p => p._id === selectedPayment._id ? response.data.data : p));
+        }
+      } else if (modalMode === "draft") {
+        const selectedInvoice = invoices.find(inv => inv._id === paymentData.invoice);
+        const draftPayload = {
+          ...payload,
+          client: selectedInvoice?.client || payload.client
+        };
+        const response = await api.post("/api/draft-payments", draftPayload);
+        if (response.data.success) {
+          await fetchDraftPayments();
         }
       }
 
@@ -350,18 +515,52 @@ export function PaymentsPage() {
           </Card>
         </div>
 
+        {/* Tabs */}
+        <div className="flex space-x-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+          <button
+            onClick={() => setActiveTab("payments")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "payments"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <CreditCard size={16} className="mr-2 inline" />
+            Payments
+          </button>
+          <button
+            onClick={() => setActiveTab("drafts")}
+            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              activeTab === "drafts"
+                ? "bg-white text-gray-900 shadow-sm"
+                : "text-gray-600 hover:text-gray-900"
+            }`}
+          >
+            <Clock size={16} className="mr-2 inline" />
+            Draft Transactions ({draftPayments.filter(d => d.status === "pending").length})
+          </button>
+        </div>
+
         <div className="flex justify-between items-center mb-6">
           <div className="flex-1 max-w-md">
             <Input
-              placeholder="Search payments..."
+              placeholder={`Search ${activeTab === "payments" ? "payments" : "draft transactions"}...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="primary" onClick={handleCreate}>
-            <Plus size={16} className="mr-2" />
-            Create Payment
-          </Button>
+          <div className="flex space-x-3">
+            {activeTab === "drafts" && (
+              <Button variant="outline" onClick={handleCreateDraft}>
+                <Plus size={16} className="mr-2" />
+                Add Draft Transaction
+              </Button>
+            )}
+            <Button variant="primary" onClick={handleCreate}>
+              <Plus size={16} className="mr-2" />
+              Create Payment
+            </Button>
+          </div>
         </div>
 
         <Card>
@@ -381,6 +580,11 @@ export function PaymentsPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Type
                   </th>
+                  {activeTab === "drafts" && (
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  )}
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Reference
                   </th>
@@ -393,73 +597,159 @@ export function PaymentsPage() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPayments.map((payment) => (
-                  <tr key={payment._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <FileText size={14} className="mr-2 text-gray-400" />
-                        <span className="text-sm font-medium text-gray-900">
-                          {payment.invoice?.invoiceNumber || "N/A"}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Building size={14} className="mr-2 text-gray-400" />
-                        <span>{payment.client?.companyName || "N/A"}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        ₹{payment.amount?.toLocaleString() || "0"}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {payment.currency || "INR"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {getPaymentTypeBadge(payment.type)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {payment.referenceNumber || "N/A"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center text-sm text-gray-900">
-                        <Calendar size={14} className="mr-1 text-gray-400" />
-                        <span>{new Date(payment.paymentDate).toLocaleDateString()}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleView(payment)}
-                      >
-                        <Eye size={14} className="mr-1" />
-                        View
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEdit(payment)}
-                      >
-                        <Edit size={14} className="mr-1" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDelete(payment)}
-                        className="text-red-600 hover:text-red-700"
-                      >
-                        <Trash2 size={14} className="mr-1" />
-                        Delete
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
+                {activeTab === "payments" ? (
+                  filteredPayments.map((payment) => (
+                    <tr key={payment._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <FileText size={14} className="mr-2 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {payment.invoice?.invoiceNumber || "N/A"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Building size={14} className="mr-2 text-gray-400" />
+                          <span>{payment.client?.companyName || "N/A"}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          ₹{payment.amount?.toLocaleString() || "0"}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {payment.currency || "INR"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getPaymentTypeBadge(payment.type)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {payment.referenceNumber || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Calendar size={14} className="mr-1 text-gray-400" />
+                          <span>{new Date(payment.paymentDate).toLocaleDateString()}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleView(payment)}
+                        >
+                          <Eye size={14} className="mr-1" />
+                          View
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEdit(payment)}
+                        >
+                          <Edit size={14} className="mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDelete(payment)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 size={14} className="mr-1" />
+                          Delete
+                        </Button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  filteredDrafts.map((draft) => (
+                    <tr key={draft._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <FileText size={14} className="mr-2 text-gray-400" />
+                          <span className="text-sm font-medium text-gray-900">
+                            {draft.invoice?.invoiceNumber || "N/A"}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Building size={14} className="mr-2 text-gray-400" />
+                          <span>{draft.client?.companyName || "N/A"}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          ₹{draft.amount?.toLocaleString() || "0"}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {draft.currency || "INR"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {getPaymentTypeBadge(draft.type)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Badge variant={
+                          draft.status === "pending" ? "warning" :
+                          draft.status === "approved" ? "success" : "destructive"
+                        }>
+                          {draft.status === "pending" && <Clock size={12} className="mr-1" />}
+                          {draft.status === "approved" && <Check size={12} className="mr-1" />}
+                          {draft.status === "rejected" && <XCircle size={12} className="mr-1" />}
+                          {draft.status}
+                        </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm text-gray-900">
+                          {draft.referenceNumber || "N/A"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-900">
+                          <Calendar size={14} className="mr-1 text-gray-400" />
+                          <span>{new Date(draft.paymentDate).toLocaleDateString()}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDraft(draft)}
+                        >
+                          <Eye size={14} className="mr-1" />
+                          View
+                        </Button>
+                        {draft.status === "pending" && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleApproveDraft(draft)}
+                              className="text-green-600 hover:text-green-700"
+                            >
+                              <Check size={14} className="mr-1" />
+                              Approve
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleRejectDraft(draft)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle size={14} className="mr-1" />
+                              Reject
+                            </Button>
+                          </>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
@@ -472,7 +762,12 @@ export function PaymentsPage() {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">
                   {modalMode === "create" ? "Create New Payment" : 
-                   modalMode === "edit" ? "Edit Payment" : "Payment Details"}
+                   modalMode === "edit" ? "Edit Payment" :
+                   modalMode === "draft" ? "Create Draft Transaction" :
+                   modalMode === "viewDraft" ? "Draft Transaction Details" :
+                   modalMode === "approve" ? "Approve Draft Transaction" :
+                   modalMode === "reject" ? "Reject Draft Transaction" :
+                   "Payment Details"}
                 </h2>
                 <Button
                   variant="outline"
@@ -519,6 +814,165 @@ export function PaymentsPage() {
                       <p className="mt-1 text-sm text-gray-900">{selectedPayment.notes}</p>
                     </div>
                   )}
+                  {selectedPayment?.screenshots && selectedPayment.screenshots.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Payment Screenshots</label>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {selectedPayment.screenshots.map((screenshot, index) => (
+                          <div key={index} className="relative border rounded-lg p-2">
+                            <img
+                              src={screenshot}
+                              alt={`Payment screenshot ${index + 1}`}
+                              className="w-full h-20 object-cover rounded cursor-pointer hover:opacity-80"
+                              onClick={() => window.open(screenshot, '_blank')}
+                            />
+                            <div className="mt-1 text-xs text-gray-600 text-center">
+                              Screenshot {index + 1}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : modalMode === "viewDraft" ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Invoice</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedDraft?.invoice?.invoiceNumber || "N/A"}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Client</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedDraft?.client?.companyName || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Amount</label>
+                      <p className="mt-1 text-sm text-gray-900">₹{selectedDraft?.amount?.toLocaleString() || "0"}</p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Payment Type</label>
+                      <div className="mt-1">{getPaymentTypeBadge(selectedDraft?.type)}</div>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Status</label>
+                      <div className="mt-1">
+                        <Badge variant={
+                          selectedDraft?.status === "pending" ? "warning" :
+                          selectedDraft?.status === "approved" ? "success" : "destructive"
+                        }>
+                          {selectedDraft?.status === "pending" && <Clock size={12} className="mr-1" />}
+                          {selectedDraft?.status === "approved" && <Check size={12} className="mr-1" />}
+                          {selectedDraft?.status === "rejected" && <XCircle size={12} className="mr-1" />}
+                          {selectedDraft?.status}
+                        </Badge>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Reference Number</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedDraft?.referenceNumber || "N/A"}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Payment Date</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedDraft?.paymentDate ? new Date(selectedDraft.paymentDate).toLocaleDateString() : "N/A"}</p>
+                  </div>
+                  {selectedDraft?.notes && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Notes</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedDraft.notes}</p>
+                    </div>
+                  )}
+                  {selectedDraft?.screenshots && selectedDraft.screenshots.length > 0 && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Payment Screenshots</label>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        {selectedDraft.screenshots.map((screenshot, index) => (
+                          <div key={index} className="relative border rounded-lg p-2">
+                            <img
+                              src={screenshot}
+                              alt={`Payment screenshot ${index + 1}`}
+                              className="w-full h-20 object-cover rounded cursor-pointer hover:opacity-80"
+                              onClick={() => window.open(screenshot, '_blank')}
+                            />
+                            <div className="mt-1 text-xs text-gray-600 text-center">
+                              Screenshot {index + 1}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {selectedDraft?.reviewNote && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Review Note</label>
+                      <p className="mt-1 text-sm text-gray-900">{selectedDraft.reviewNote}</p>
+                    </div>
+                  )}
+                  {selectedDraft?.reviewedAt && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Reviewed At</label>
+                      <p className="mt-1 text-sm text-gray-900">{new Date(selectedDraft.reviewedAt).toLocaleString()}</p>
+                    </div>
+                  )}
+                </div>
+              ) : modalMode === "approve" || modalMode === "reject" ? (
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h3 className="font-medium text-gray-900 mb-2">Draft Transaction Details</h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-500">Invoice:</span>
+                        <span className="ml-2 font-medium">{selectedDraft?.invoice?.invoiceNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Client:</span>
+                        <span className="ml-2 font-medium">{selectedDraft?.client?.companyName}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Amount:</span>
+                        <span className="ml-2 font-medium">₹{selectedDraft?.amount?.toLocaleString()}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Type:</span>
+                        <span className="ml-2">{selectedDraft?.type}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Review Note {modalMode === "reject" && <span className="text-red-500">*</span>}
+                    </label>
+                    <textarea
+                      value={reviewNote}
+                      onChange={(e) => setReviewNote(e.target.value)}
+                      rows={3}
+                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder={modalMode === "approve" ? "Optional note about the approval..." : "Required note explaining the rejection..."}
+                    />
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={modalMode === "approve" ? submitApproval : submitRejection}
+                      disabled={submitting}
+                      variant={modalMode === "approve" ? "primary" : "destructive"}
+                    >
+                      {submitting ? "Processing..." : modalMode === "approve" ? "Approve Transaction" : "Reject Transaction"}
+                    </Button>
+                  </div>
                 </div>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -635,6 +1089,61 @@ export function PaymentsPage() {
                     />
                   </div>
 
+                  {/* File Upload Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Payment Screenshots (Optional)</label>
+                    <div className="border-2 border-dashed border-gray-300 rounded-lg p-4">
+                      <div className="text-center">
+                        <Upload size={24} className="mx-auto text-gray-400 mb-2" />
+                        <div className="text-sm text-gray-600 mb-2">
+                          Upload payment receipts, bank statements, or transaction screenshots
+                        </div>
+                        <input
+                          type="file"
+                          multiple
+                          accept="image/*"
+                          onChange={handleFileUpload}
+                          className="hidden"
+                          id="file-upload"
+                        />
+                        <label
+                          htmlFor="file-upload"
+                          className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 cursor-pointer"
+                        >
+                          <Upload size={16} className="mr-2" />
+                          Choose Files
+                        </label>
+                        <p className="text-xs text-gray-500 mt-1">Max 5 files, 5MB each</p>
+                      </div>
+                    </div>
+
+                    {/* Uploaded Files Preview */}
+                    {uploadedFiles.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <h4 className="text-sm font-medium text-gray-700">Uploaded Files:</h4>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {uploadedFiles.map((file, index) => (
+                            <div key={index} className="relative border rounded-lg p-2">
+                              <img
+                                src={file.data}
+                                alt={file.name}
+                                className="w-full h-20 object-cover rounded"
+                              />
+                              <div className="mt-1 text-xs text-gray-600 truncate">{file.name}</div>
+                              <button
+                                type="button"
+                                onClick={() => removeFile(index)}
+                                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
                   <div className="flex justify-end space-x-3 pt-4">
                     <Button
                       type="button"
@@ -644,7 +1153,10 @@ export function PaymentsPage() {
                       Cancel
                     </Button>
                     <Button type="submit" disabled={submitting}>
-                      {submitting ? "Saving..." : modalMode === "create" ? "Create Payment" : "Update Payment"}
+                      {submitting ? "Saving..." : 
+                       modalMode === "create" ? "Create Payment" : 
+                       modalMode === "draft" ? "Create Draft Transaction" : 
+                       "Update Payment"}
                     </Button>
                   </div>
                 </form>

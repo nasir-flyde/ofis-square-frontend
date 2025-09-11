@@ -29,7 +29,7 @@ export function UploadSignedContractPage() {
   const fetchContract = async () => {
     try {
       const { data } = await api.get(`/api/contracts/${contractId}`);
-      setContract(data);
+      setContract(data?.data || null);
     } catch (error) {
       setError('Failed to fetch contract details');
       console.error('Failed to fetch contract:', error);

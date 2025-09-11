@@ -149,6 +149,10 @@ export function ContractPage() {
       
       const { data } = await api.post("/api/contracts", contractData);
       
+      // Store building information for allocation phase
+      localStorage.setItem('ofis_selected_building_id', formData.buildingId);
+      localStorage.setItem('ofis_selected_building', JSON.stringify(selectedBuilding));
+      
       // Generate and download PDF
       const response = await api.get(`/api/contracts/${data.contract._id}/download-pdf`, {
         responseType: 'blob'

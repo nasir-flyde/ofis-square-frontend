@@ -12,7 +12,6 @@ export function Header({ user, onLogout, baseUrl, onBaseUrlChange }) {
               <p className="text-sm text-gray-500">Admin Dashboard</p>
             </div>
           </div>
-          
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <label className="text-sm font-medium text-gray-700">API Base:</label>

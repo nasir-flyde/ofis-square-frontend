@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import axios from "axios";
 
 export function useApi(baseUrl = "https://ofis-square-backend.onrender.com") {
-//export function useApi(baseUrl = "http://localhost:5001") {
+// export function useApi(baseUrl = "http://localhost:5001") {
   const [token, setToken] = useState(localStorage.getItem("ofis_admin_token") || "");
 
   const client = useMemo(() => {
@@ -22,7 +22,6 @@ export function useApi(baseUrl = "https://ofis-square-backend.onrender.com") {
           // Token expired or invalid
           localStorage.removeItem("ofis_admin_token");
           setToken("");
-          // Avoid hard reload loops; send unauthenticated users to /auth
           if (typeof window !== "undefined") {
             const currentPath = window.location.pathname || "";
             if (currentPath !== "/auth") {

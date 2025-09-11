@@ -13,8 +13,11 @@ export function ClientsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedClient, setSelectedClient] = useState(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editError, setEditError] = useState("");
   const { client: api } = useApi();
 
   // Details modal tab state and data
@@ -41,6 +44,17 @@ export function ClientsPage() {
     amount: "",
     notes: "",
     member: ""
+  });
+
+  // Edit client form state
+  const [editForm, setEditForm] = useState({
+    companyName: "",
+    contactPerson: "",
+    email: "",
+    phone: "",
+    companyAddress: "",
+    kycStatus: "none",
+    kycRejectionReason: ""
   });
 
   const fetchClients = async () => {
@@ -89,6 +103,47 @@ export function ClientsPage() {
     return <Badge variant={config.variant}>{config.label}</Badge>;
   };
 
+  const getOnboardingStatus = (client) => {
+    // Check onboarding completion stages
+    const hasBasicDetails = client.companyDetailsComplete;
+    const hasVerifiedKyc = client.kycStatus === 'verified';
+    
+    // Check if client has active contract (simplified check)
+    const hasContract = client.contractStatus === 'active' || client.hasActiveContract;
+    
+    // Check if client has allocated cabin (we'll need to enhance this with actual data)
+    const hasCabin = client.hasCabin || client.allocatedCabin;
+    
+    if (!hasBasicDetails) return { stage: 'basic-details', complete: false };
+    if (!hasVerifiedKyc) return { stage: 'kyc', complete: false };
+    if (!hasContract) return { stage: 'contract', complete: false };
+    if (!hasCabin) return { stage: 'cabin', complete: false };
+    
+    return { stage: 'complete', complete: true };
+  };
+
+  const handleCompleteOnboarding = (client) => {
+    const status = getOnboardingStatus(client);
+    
+    switch (status.stage) {
+      case 'basic-details':
+        navigate(`/dashboard`);
+        break;
+      case 'kyc':
+        navigate(`/kyc`);
+        break;
+      case 'contract':
+        navigate(`/contract`);
+        break;
+      case 'cabin':
+        navigate(`/allocation`);
+        break;
+      default:
+        // Already complete
+        break;
+    }
+  };
+
   const handleViewDetails = (client) => {
     setSelectedClient(client);
     setActiveTab("overview");
@@ -97,6 +152,60 @@ export function ClientsPage() {
 
   const handleCloseDetails = () => {
     setShowDetailsModal(false);
+  };
+
+  const handleEditClient = (client) => {
+    setSelectedClient(client);
+    setEditForm({
+      companyName: client.companyName || "",
+      contactPerson: client.contactPerson || "",
+      email: client.email || "",
+      phone: client.phone || "",
+      companyAddress: client.companyAddress || "",
+      kycStatus: client.kycStatus || "none",
+      kycRejectionReason: client.kycRejectionReason || ""
+    });
+    setEditError("");
+    setShowEditModal(true);
+  };
+
+  const handleCloseEditModal = () => {
+    setShowEditModal(false);
+    setEditError("");
+  };
+
+  const handleUpdateClient = async (e) => {
+    e.preventDefault();
+    setEditError("");
+    setEditSubmitting(true);
+
+    try {
+      const response = await api.put(`/api/clients/${selectedClient._id}`, editForm);
+      
+      if (response.data.success) {
+        // Update the client in the local state
+        const updatedClients = clients.map(client => 
+          client._id === selectedClient._id 
+            ? { ...client, ...editForm }
+            : client
+        );
+        setClients(updatedClients);
+        setFilteredClients(updatedClients);
+        
+        // Close the modal
+        setShowEditModal(false);
+        
+        // Optionally show success message
+        console.log("Client updated successfully");
+      } else {
+        setEditError(response.data.message || "Failed to update client");
+      }
+    } catch (err) {
+      console.error("Error updating client:", err);
+      setEditError(err.response?.data?.message || "Failed to update client");
+    } finally {
+      setEditSubmitting(false);
+    }
   };
 
   // Meeting booking helpers
@@ -337,10 +446,7 @@ export function ClientsPage() {
                     KYC Status
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Profile Complete
-                  </th>
-                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Created Date
+                    Onboarding Status
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -375,28 +481,47 @@ export function ClientsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-center">
                       {getStatusBadge(client.kycStatus)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {client.companyDetailsComplete ? "✓" : "✗"}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {new Date(client.createdAt).toLocaleDateString()}
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      {(() => {
+                        const status = getOnboardingStatus(client);
+                        if (status.complete) {
+                          return <Badge variant="success">Complete</Badge>;
+                        }
+                        const stageLabels = {
+                          'basic-details': 'Basic Details',
+                          'kyc': 'KYC Pending',
+                          'contract': 'Contract Pending',
+                          'cabin': 'Cabin Pending'
+                        };
+                        return <Badge variant="warning">{stageLabels[status.stage]}</Badge>;
+                      })()} 
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewDetails(client)}
-                      >
-                        View Details
-                      </Button>
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        onClick={() => openBookingModal(client)}
-                        className="ml-2"
-                      >
-                        Book Meeting
-                      </Button>
+                      <div className="flex gap-2 justify-center">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDetails(client)}
+                        >
+                          View Details
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={() => handleEditClient(client)}
+                        >
+                          Edit
+                        </Button>
+                        {!getOnboardingStatus(client).complete && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleCompleteOnboarding(client)}
+                          >
+                            Complete Onboarding
+                          </Button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -588,9 +713,131 @@ export function ClientsPage() {
                 <Button variant="outline" onClick={handleCloseDetails}>
                   Close
                 </Button>
-                <Button variant="primary">
+                <Button variant="primary" onClick={() => {
+                  handleCloseDetails();
+                  handleEditClient(selectedClient);
+                }}>
                   Edit Client
                 </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Client Modal */}
+        {showEditModal && selectedClient && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-gray-900">Edit Client</h2>
+                  <button
+                    onClick={handleCloseEditModal}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">Update client information</p>
+              </div>
+              
+              <div className="p-6">
+                {editError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-red-600">{editError}</p>
+                  </div>
+                )}
+                
+                <form onSubmit={handleUpdateClient} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name *</label>
+                      <Input
+                        value={editForm.companyName}
+                        onChange={(e) => setEditForm({ ...editForm, companyName: e.target.value })}
+                        placeholder="Enter company name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person *</label>
+                      <Input
+                        value={editForm.contactPerson}
+                        onChange={(e) => setEditForm({ ...editForm, contactPerson: e.target.value })}
+                        placeholder="Enter contact person name"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+                      <Input
+                        type="email"
+                        value={editForm.email}
+                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                        placeholder="Enter email address"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
+                      <Input
+                        value={editForm.phone}
+                        onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
+                        placeholder="Enter phone number"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Company Address</label>
+                    <textarea
+                      value={editForm.companyAddress}
+                      onChange={(e) => setEditForm({ ...editForm, companyAddress: e.target.value })}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter company address"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">KYC Status</label>
+                      <select
+                        value={editForm.kycStatus}
+                        onChange={(e) => setEditForm({ ...editForm, kycStatus: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      >
+                        <option value="none">Not Started</option>
+                        <option value="pending">Pending</option>
+                        <option value="verified">Verified</option>
+                        <option value="rejected">Rejected</option>
+                      </select>
+                    </div>
+                    {editForm.kycStatus === 'rejected' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Rejection Reason</label>
+                        <Input
+                          value={editForm.kycRejectionReason}
+                          onChange={(e) => setEditForm({ ...editForm, kycRejectionReason: e.target.value })}
+                          placeholder="Enter rejection reason"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button variant="outline" type="button" onClick={handleCloseEditModal}>
+                      Cancel
+                    </Button>
+                    <Button variant="primary" type="submit" loading={editSubmitting}>
+                      {editSubmitting ? "Updating..." : "Update Client"}
+                    </Button>
+                  </div>
+                </form>
               </div>
             </div>
           </div>

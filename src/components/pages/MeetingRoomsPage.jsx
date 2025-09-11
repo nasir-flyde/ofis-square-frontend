@@ -17,7 +17,12 @@ export function MeetingRoomsPage() {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [showBookingModal, setShowBookingModal] = useState(false);
+  const [showBookingsListModal, setShowBookingsListModal] = useState(false);
   const [modalMode, setModalMode] = useState("create"); // "create", "edit", "view"
+  const [bookings, setBookings] = useState([]);
+  const [bookingsLoading, setBookingsLoading] = useState(false);
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [formData, setFormData] = useState({
     building: "",
     name: "",
@@ -38,13 +43,17 @@ export function MeetingRoomsPage() {
     }
   });
   const [bookingData, setBookingData] = useState({
-    client: "",
+    clientId: "",
+    member: "",
     title: "",
     description: "",
     start: "",
     end: "",
     attendeesCount: "1",
     amenitiesRequested: [],
+    paymentMethod: "credits",
+    amount: "",
+    currency: "INR",
     notes: ""
   });
   const [formErrors, setFormErrors] = useState({});
@@ -90,6 +99,41 @@ export function MeetingRoomsPage() {
       }
     } catch (err) {
       console.error("Error fetching clients:", err);
+    }
+  };
+
+  const fetchBookings = async () => {
+    try {
+      setBookingsLoading(true);
+      const response = await api.get("/api/meeting-bookings");
+      if (response.data.success) {
+        setBookings(response.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching bookings:", err);
+      setError("Failed to fetch bookings");
+    } finally {
+      setBookingsLoading(false);
+    }
+  };
+
+  const fetchMembersByClient = async (clientId) => {
+    if (!clientId) {
+      setMembers([]);
+      return;
+    }
+    
+    try {
+      setMembersLoading(true);
+      const response = await api.get(`/api/members?client=${clientId}`);
+      if (response.data.success) {
+        setMembers(response.data.data);
+      }
+    } catch (err) {
+      console.error("Error fetching members:", err);
+      setMembers([]);
+    } finally {
+      setMembersLoading(false);
     }
   };
 
@@ -145,16 +189,21 @@ export function MeetingRoomsPage() {
 
   const resetBookingForm = () => {
     setBookingData({
-      client: "",
+      clientId: "",
+      member: "",
       title: "",
       description: "",
       start: "",
       end: "",
       attendeesCount: "1",
       amenitiesRequested: [],
+      paymentMethod: "credits",
+      amount: "",
+      currency: "INR",
       notes: ""
     });
     setFormErrors({});
+    setMembers([]);
   };
 
   const handleCreate = () => {
@@ -213,6 +262,16 @@ export function MeetingRoomsPage() {
     resetBookingForm();
   };
 
+  const handleShowBookings = () => {
+    fetchBookings();
+    setShowBookingsListModal(true);
+  };
+
+  const handleCloseBookingsModal = () => {
+    setShowBookingsListModal(false);
+    setBookings([]);
+  };
+
   const validateForm = () => {
     const errors = {};
     
@@ -243,8 +302,8 @@ export function MeetingRoomsPage() {
   const validateBookingForm = () => {
     const errors = {};
     
-    if (!bookingData.client) {
-      errors.client = "Client is required";
+    if (!bookingData.clientId) {
+      errors.clientId = "Client is required";
     }
     
     if (!bookingData.title.trim()) {
@@ -265,6 +324,10 @@ export function MeetingRoomsPage() {
 
     if (!bookingData.attendeesCount || isNaN(bookingData.attendeesCount) || bookingData.attendeesCount < 1) {
       errors.attendeesCount = "Attendees count must be a positive number";
+    }
+
+    if (bookingData.paymentMethod === 'cash' && bookingData.amount && (isNaN(bookingData.amount) || bookingData.amount < 0)) {
+      errors.amount = "Amount must be a positive number";
     }
 
     setFormErrors(errors);
@@ -331,15 +394,19 @@ export function MeetingRoomsPage() {
     try {
       const payload = {
         room: selectedRoom._id,
-        client: bookingData.client,
+        clientId: bookingData.clientId,
+        member: bookingData.member || undefined,
         title: bookingData.title,
         description: bookingData.description,
         start: bookingData.start,
         end: bookingData.end,
         attendeesCount: parseInt(bookingData.attendeesCount),
         amenitiesRequested: bookingData.amenitiesRequested,
+        paymentMethod: bookingData.paymentMethod,
+        amount: bookingData.amount ? parseFloat(bookingData.amount) : undefined,
+        currency: bookingData.currency,
         notes: bookingData.notes,
-        paymentMethod: "cash" // Default payment method
+        idempotencyKey: bookingData.paymentMethod === 'credits' ? `booking-${Date.now()}-${Math.random()}` : undefined
       };
 
       const response = await api.post("/api/meeting-bookings", payload);
@@ -495,9 +562,14 @@ export function MeetingRoomsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="primary" onClick={handleCreate}>
-            Add New Meeting Room
-          </Button>
+          <div className="flex gap-3">
+            <Button variant="outline" onClick={handleShowBookings}>
+              View Bookings
+            </Button>
+            <Button variant="primary" onClick={handleCreate}>
+              Add New Meeting Room
+            </Button>
+          </div>
         </div>
 
         {/* Meeting Rooms Table */}
@@ -956,9 +1028,13 @@ export function MeetingRoomsPage() {
                       Client *
                     </label>
                     <select
-                      value={bookingData.client}
-                      onChange={(e) => setBookingData({ ...bookingData, client: e.target.value })}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.client ? "border-red-300" : "border-gray-300"}`}
+                      value={bookingData.clientId}
+                      onChange={(e) => {
+                        const clientId = e.target.value;
+                        setBookingData({ ...bookingData, clientId, member: "" });
+                        fetchMembersByClient(clientId);
+                      }}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.clientId ? "border-red-300" : "border-gray-300"}`}
                     >
                       <option value="">Select Client</option>
                       {clients.map((client) => (
@@ -967,8 +1043,74 @@ export function MeetingRoomsPage() {
                         </option>
                       ))}
                     </select>
-                    {formErrors.client && (
-                      <p className="text-sm text-red-600 mt-1">{formErrors.client}</p>
+                    {formErrors.clientId && (
+                      <p className="text-sm text-red-600 mt-1">{formErrors.clientId}</p>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Member (Optional)
+                    </label>
+                    <select
+                      value={bookingData.member}
+                      onChange={(e) => setBookingData({ ...bookingData, member: e.target.value })}
+                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.member ? "border-red-300" : "border-gray-300"}`}
+                      disabled={!bookingData.clientId || membersLoading}
+                    >
+                      <option value="">
+                        {!bookingData.clientId ? "Select a client first" : 
+                         membersLoading ? "Loading members..." : 
+                         "Select Member (Optional)"}
+                      </option>
+                      {members.map((member) => (
+                        <option key={member._id} value={member._id}>
+                          {member.firstName} {member.lastName} - {member.email}
+                        </option>
+                      ))}
+                    </select>
+                    {formErrors.member && (
+                      <p className="text-sm text-red-600 mt-1">{formErrors.member}</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Payment Method *
+                      </label>
+                      <select
+                        value={bookingData.paymentMethod}
+                        onChange={(e) => setBookingData({ ...bookingData, paymentMethod: e.target.value })}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.paymentMethod ? "border-red-300" : "border-gray-300"}`}
+                      >
+                        <option value="credits">Credits</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                      </select>
+                      {formErrors.paymentMethod && (
+                        <p className="text-sm text-red-600 mt-1">{formErrors.paymentMethod}</p>
+                      )}
+                    </div>
+
+                    {bookingData.paymentMethod !== 'credits' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Amount ({bookingData.currency})
+                        </label>
+                        <Input
+                          type="number"
+                          value={bookingData.amount}
+                          onChange={(e) => setBookingData({ ...bookingData, amount: e.target.value })}
+                          placeholder="Enter amount"
+                          min="0"
+                          step="0.01"
+                          className={formErrors.amount ? "border-red-300" : ""}
+                        />
+                        {formErrors.amount && (
+                          <p className="text-sm text-red-600 mt-1">{formErrors.amount}</p>
+                        )}
+                      </div>
                     )}
                   </div>
 
@@ -1095,6 +1237,164 @@ export function MeetingRoomsPage() {
                     </Button>
                   </div>
                 </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Bookings List Modal */}
+        {showBookingsListModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-gray-900">Meeting Room Bookings</h2>
+                  <button
+                    onClick={handleCloseBookingsModal}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                {bookingsLoading ? (
+                  <div className="text-center py-10">
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Loading bookings...</p>
+                  </div>
+                ) : bookings.length === 0 ? (
+                  <div className="text-center py-10">
+                    <div className="text-gray-400 mb-4">
+                      <Calendar size={48} className="mx-auto" />
+                    </div>
+                    <p className="text-gray-600">No bookings found</p>
+                    <p className="text-sm text-gray-500 mt-1">Meeting room bookings will appear here</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Meeting Details
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Room
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Client/Member
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Date & Time
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Attendees
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Payment
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {bookings.map((booking) => (
+                          <tr key={booking._id} className="hover:bg-gray-50">
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div>
+                                <div className="text-sm font-medium text-gray-900">
+                                  {booking.title || "Meeting"}
+                                </div>
+                                {booking.description && (
+                                  <div className="text-sm text-gray-500 max-w-xs truncate">
+                                    {booking.description}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center">
+                                <MapPin size={14} className="mr-1 text-gray-400" />
+                                <span className="text-sm text-gray-900">
+                                  {booking.room?.name || "N/A"}
+                                </span>
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                Capacity: {booking.room?.capacity || "N/A"}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {booking.member ? (
+                                  <>
+                                    {booking.member.firstName} {booking.member.lastName}
+                                    <div className="text-xs text-gray-500">
+                                      {booking.member.email}
+                                    </div>
+                                  </>
+                                ) : (
+                                  "N/A"
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {new Date(booking.start).toLocaleDateString()}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {new Date(booking.start).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} - 
+                                {new Date(booking.end).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="flex items-center text-sm text-gray-900">
+                                <Users size={14} className="mr-1" />
+                                {booking.attendeesCount || 1}
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <Badge 
+                                variant={
+                                  booking.status === 'booked' ? 'success' : 
+                                  booking.status === 'cancelled' ? 'secondary' : 
+                                  'default'
+                                }
+                              >
+                                {booking.status?.charAt(0).toUpperCase() + booking.status?.slice(1)}
+                              </Badge>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <div className="text-sm text-gray-900">
+                                {booking.payment?.method === 'credits' ? (
+                                  <div>
+                                    <div className="text-xs text-blue-600">Credits</div>
+                                    <div className="text-xs text-gray-500">
+                                      {booking.payment.coveredCredits || 0} credits
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div>
+                                    <div className="text-xs text-green-600">
+                                      {booking.payment?.method?.charAt(0).toUpperCase() + booking.payment?.method?.slice(1) || 'Cash'}
+                                    </div>
+                                    {booking.payment?.amount && (
+                                      <div className="text-xs text-gray-500">
+                                        ₹{booking.payment.amount}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </div>
           </div>
