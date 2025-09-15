@@ -15,7 +15,8 @@ import {
   BarChart3,
   Ticket,
   CreditCard,
-  QrCode
+  QrCode,
+  UserCheck
 } from "lucide-react";
 
 export function Sidebar() {
@@ -53,6 +54,12 @@ export function Sidebar() {
       icon: <Users size={20} />, 
       path: "/clients" 
     },
+    // { 
+    //   id: "members", 
+    //   label: "Members", 
+    //   icon: <UserCheck size={20} />, 
+    //   path: "/members" 
+    // },
     { 
       id: "cabins", 
       label: "Cabins", 

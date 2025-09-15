@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card } from "../ui/Card";
 import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Badge } from "../ui/Badge";
 import { useApi } from "../../hooks/useApi";
+import { CreateClient } from "../auth/CreateClient";
 
 export function ClientsPage() {
   const navigate = useNavigate();
@@ -19,19 +20,24 @@ export function ClientsPage() {
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState("");
   const { client: api } = useApi();
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
 
-  // Details modal tab state and data
   const [activeTab, setActiveTab] = useState("overview");
   const [cabins, setCabins] = useState([]);
   const [cabinsLoading, setCabinsLoading] = useState(false);
   const [invoices, setInvoices] = useState([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
 
-  // Meeting booking modal state
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [rooms, setRooms] = useState([]);
   const [bookingSubmitting, setBookingSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState("");
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [memberSubmitting, setMemberSubmitting] = useState(false);
+  const [memberError, setMemberError] = useState("");
+  const [members, setMembers] = useState([]);
+  const [membersLoading, setMembersLoading] = useState(false);
   const [bookingForm, setBookingForm] = useState({
     room: "",
     title: "",
@@ -46,6 +52,17 @@ export function ClientsPage() {
     member: ""
   });
 
+  // Add member form state
+  const [memberForm, setMemberForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    companyName: "",
+    role: "",
+    status: "active"
+  });
+
   // Edit client form state
   const [editForm, setEditForm] = useState({
     companyName: "",
@@ -53,6 +70,8 @@ export function ClientsPage() {
     email: "",
     phone: "",
     companyAddress: "",
+    industry: "",
+    gstNumber: "",
     kycStatus: "none",
     kycRejectionReason: ""
   });
@@ -74,6 +93,25 @@ export function ClientsPage() {
       setError(err.response?.data?.error || "Failed to fetch clients");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCreateClient = async (payload) => {
+    setCreateLoading(true);
+    try {
+      const resp = await api.post("/api/clients", payload);
+      if (resp?.data?.client || resp?.data?.data || resp?.data?.success) {
+        // Refresh list
+        await fetchClients();
+        setShowCreateModal(false);
+      } else {
+        throw new Error(resp?.data?.error || resp?.data?.message || "Failed to create client");
+      }
+    } catch (e) {
+      console.error("Create client failed:", e);
+      throw e;
+    } finally {
+      setCreateLoading(false);
     }
   };
 
@@ -104,14 +142,10 @@ export function ClientsPage() {
   };
 
   const getOnboardingStatus = (client) => {
-    // Check onboarding completion stages
     const hasBasicDetails = client.companyDetailsComplete;
     const hasVerifiedKyc = client.kycStatus === 'verified';
-    
-    // Check if client has active contract (simplified check)
+  
     const hasContract = client.contractStatus === 'active' || client.hasActiveContract;
-    
-    // Check if client has allocated cabin (we'll need to enhance this with actual data)
     const hasCabin = client.hasCabin || client.allocatedCabin;
     
     if (!hasBasicDetails) return { stage: 'basic-details', complete: false };
@@ -133,10 +167,28 @@ export function ClientsPage() {
         navigate(`/kyc`);
         break;
       case 'contract':
-        navigate(`/contract`);
+        {
+          const pendingContract = Array.isArray(client.contracts)
+            ? client.contracts.find((c) => c.status === 'pending_signature')
+            : null;
+          if (pendingContract?._id) {
+            navigate(`/upload-signed-contract/${pendingContract._id}`);
+          } else {
+            navigate(`/contract`);
+          }
+        }
         break;
       case 'cabin':
-        navigate(`/allocation`);
+        {
+          const buildingId = client.building?._id || client.building;
+          const buildingData = client.building;
+          if (buildingId && buildingData) {
+            localStorage.setItem('ofis_selected_building_id', buildingId);
+            localStorage.setItem('ofis_selected_building', JSON.stringify(buildingData));
+          }
+          localStorage.setItem('ofis_current_client_id', client._id);
+          navigate(`/allocation`);
+        }
         break;
       default:
         // Already complete
@@ -162,6 +214,8 @@ export function ClientsPage() {
       email: client.email || "",
       phone: client.phone || "",
       companyAddress: client.companyAddress || "",
+      industry: client.industry || "",
+      gstNumber: client.gstNumber || "",
       kycStatus: client.kycStatus || "none",
       kycRejectionReason: client.kycRejectionReason || ""
     });
@@ -286,7 +340,71 @@ export function ClientsPage() {
     }
   };
 
-  // Fetch cabins and invoices when a client is selected and tab switches
+  // Add member modal helpers
+  const openAddMemberModal = (client) => {
+    setSelectedClient(client);
+    setMemberError("");
+    setMemberSubmitting(false);
+    setMemberForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      phone: "",
+      companyName: client?.companyName || "",
+      role: "",
+      status: "active"
+    });
+    setShowAddMemberModal(true);
+  };
+
+  const closeAddMemberModal = () => {
+    setShowAddMemberModal(false);
+    setMemberError("");
+  };
+
+  const submitMember = async (e) => {
+    e.preventDefault();
+    setMemberError("");
+    setMemberSubmitting(true);
+
+    try {
+      const payload = {
+        ...memberForm,
+        client: selectedClient?._id
+      };
+
+      const resp = await api.post("/api/members", payload);
+      if (resp?.data?.success) {
+        closeAddMemberModal();
+        // Refresh members list if we're on members tab
+        if (activeTab === "members") {
+          loadMembers();
+        }
+      } else {
+        setMemberError(resp?.data?.message || "Failed to create member");
+      }
+    } catch (err) {
+      setMemberError(err.response?.data?.message || "Failed to create member");
+    } finally {
+      setMemberSubmitting(false);
+    }
+  };
+
+  // Define loadMembers function with useCallback
+  const loadMembers = useCallback(async () => {
+    if (!selectedClient) return;
+    try {
+      setMembersLoading(true);
+      const resp = await api.get("/api/members", { params: { client: selectedClient._id } });
+      setMembers(resp?.data?.data || []);
+    } catch (e) {
+      setMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [selectedClient, api]);
+
+  // Fetch cabins, invoices, and members when a client is selected and tab switches
   useEffect(() => {
     if (!selectedClient) return;
 
@@ -296,7 +414,7 @@ export function ClientsPage() {
         setCabinsLoading(true);
         const resp = await api.get("/api/cabins", { params: { status: "occupied" } });
         const all = resp?.data?.data || [];
-        const forClient = all.filter(c => (c.allocatedTo?._id || c.allocatedTo) === selectedClient._id);
+        const forClient = all.filter(c => String(c.allocatedTo?._id || c.allocatedTo) === String(selectedClient._id));
         setCabins(forClient);
       } catch (e) {
         setCabins([]);
@@ -320,7 +438,8 @@ export function ClientsPage() {
 
     loadCabins();
     loadInvoices();
-  }, [selectedClient]);
+    loadMembers();
+  }, [selectedClient, loadMembers]);
 
   if (loading) {
     return (
@@ -422,7 +541,7 @@ export function ClientsPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="primary" onClick={() => navigate('/dashboard')}>
+          <Button variant="primary" onClick={() => setShowCreateModal(true)}>
             Add New Client
           </Button>
         </div>
@@ -497,7 +616,7 @@ export function ClientsPage() {
                       })()} 
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
-                      <div className="flex gap-2 justify-center">
+                      <div className="flex gap-2 justify-center flex-wrap">
                         <Button
                           variant="outline"
                           size="sm"
@@ -511,6 +630,13 @@ export function ClientsPage() {
                           onClick={() => handleEditClient(client)}
                         >
                           Edit
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={() => navigate(`/members?client=${client._id}`)}
+                        >
+                          View Members
                         </Button>
                         {!getOnboardingStatus(client).complete && (
                           <Button
@@ -530,6 +656,26 @@ export function ClientsPage() {
           </div>
         </Card>
 
+        {/* Create Client Modal */}
+        {showCreateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200 flex items-center justify-between">
+                <h2 className="text-xl font-bold text-gray-900">Create Client</h2>
+                <button
+                  onClick={() => setShowCreateModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="p-6">
+                <CreateClient onClientCreated={handleCreateClient} loading={createLoading} />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Client Details Modal */}
         {showDetailsModal && selectedClient && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -548,20 +694,31 @@ export function ClientsPage() {
               
               <div className="p-6 space-y-6">
                 {/* Tabs */}
-                <div className="flex space-x-2 border-b border-gray-200 mb-4">
-                  {[
-                    { id: "overview", label: "Overview" },
-                    { id: "cabins", label: "Cabins" },
-                    { id: "invoices", label: "Invoices" },
-                  ].map(t => (
-                    <button
-                      key={t.id}
-                      onClick={() => setActiveTab(t.id)}
-                      className={`px-4 py-2 text-sm font-medium rounded-t-md ${activeTab === t.id ? "bg-white border-x border-t border-gray-200 -mb-px" : "text-gray-600 hover:text-gray-800"}`}
-                    >
-                      {t.label}
-                    </button>
-                  ))}
+                <div className="flex justify-between items-center border-b border-gray-200 mb-4">
+                  <div className="flex space-x-2">
+                    {[
+                      { id: "overview", label: "Overview" },
+                      { id: "cabins", label: "Cabins" },
+                      { id: "invoices", label: "Invoices" },
+                      { id: "members", label: "Members" },
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => setActiveTab(t.id)}
+                        className={`px-4 py-2 text-sm font-medium rounded-t-md ${activeTab === t.id ? "bg-white border-x border-t border-gray-200 -mb-px" : "text-gray-600 hover:text-gray-800"}`}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Add Member button - show on all tabs */}
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => openAddMemberModal(selectedClient)}
+                  >
+                    Add Member
+                  </Button>
                 </div>
 
                 {activeTab === "overview" && (
@@ -584,6 +741,14 @@ export function ClientsPage() {
                         <div>
                           <label className="text-sm font-medium text-gray-500">Phone</label>
                           <p className="text-gray-900">{selectedClient.phone || "N/A"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Industry</label>
+                          <p className="text-gray-900">{selectedClient.industry || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">GST Number</label>
+                          <p className="text-gray-900">{selectedClient.gstNumber || "—"}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">KYC Status</label>
@@ -707,6 +872,49 @@ export function ClientsPage() {
                   </div>
                 )}
 
+                {activeTab === "members" && (
+                  <div>
+                    {membersLoading ? (
+                      <div className="text-sm text-gray-600">Loading members...</div>
+                    ) : members.length === 0 ? (
+                      <div className="text-sm text-gray-600">No members found for this client.</div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                              <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                            </tr>
+                          </thead>
+                          <tbody className="bg-white divide-y divide-gray-200">
+                            {members.map(member => (
+                              <tr key={member._id} className="hover:bg-gray-50">
+                                <td className="px-4 py-2 text-sm text-gray-900">
+                                  {`${member.firstName} ${member.lastName || ''}`.trim()}
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{member.email || "-"}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{member.phone || "-"}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{member.role || "-"}</td>
+                                <td className="px-4 py-2 text-xs">
+                                  <span className={`px-2 py-1 rounded-full ${member.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}`}>
+                                    {member.status}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{new Date(member.createdAt).toLocaleDateString()}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
 
               <div className="p-6 border-t border-gray-200 flex justify-end space-x-3">
@@ -788,6 +996,25 @@ export function ClientsPage() {
                         onChange={(e) => setEditForm({ ...editForm, phone: e.target.value })}
                         placeholder="Enter phone number"
                         required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Industry (Optional)</label>
+                      <Input
+                        value={editForm.industry}
+                        onChange={(e) => setEditForm({ ...editForm, industry: e.target.value })}
+                        placeholder="e.g., Technology, Retail, Finance"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">GST Number (Optional)</label>
+                      <Input
+                        value={editForm.gstNumber}
+                        onChange={(e) => setEditForm({ ...editForm, gstNumber: e.target.value })}
+                        placeholder="e.g., 27AABCO1234A1Z5"
                       />
                     </div>
                   </div>
@@ -977,6 +1204,107 @@ export function ClientsPage() {
                     <Button variant="outline" type="button" onClick={closeBookingModal}>Cancel</Button>
                     <Button variant="primary" type="submit" loading={bookingSubmitting}>
                       {bookingSubmitting ? "Booking..." : "Create Booking"}
+                    </Button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Member Modal */}
+        {showAddMemberModal && selectedClient && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-gray-900">Add Member</h2>
+                  <button onClick={closeAddMemberModal} className="text-gray-400 hover:text-gray-600">✕</button>
+                </div>
+                <p className="text-sm text-gray-600 mt-1">Client: <span className="font-medium">{selectedClient?.companyName}</span></p>
+              </div>
+              <div className="p-6">
+                {memberError && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                    <p className="text-sm text-red-600">{memberError}</p>
+                  </div>
+                )}
+                <form onSubmit={submitMember} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                      <Input
+                        value={memberForm.firstName}
+                        onChange={(e) => setMemberForm({ ...memberForm, firstName: e.target.value })}
+                        placeholder="Enter first name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
+                      <Input
+                        value={memberForm.lastName}
+                        onChange={(e) => setMemberForm({ ...memberForm, lastName: e.target.value })}
+                        placeholder="Enter last name"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                      <Input
+                        type="email"
+                        value={memberForm.email}
+                        onChange={(e) => setMemberForm({ ...memberForm, email: e.target.value })}
+                        placeholder="Enter email address"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+                      <Input
+                        value={memberForm.phone}
+                        onChange={(e) => setMemberForm({ ...memberForm, phone: e.target.value })}
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Company Name</label>
+                      <Input
+                        value={memberForm.companyName}
+                        onChange={(e) => setMemberForm({ ...memberForm, companyName: e.target.value })}
+                        placeholder="Enter company name"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                      <Input
+                        value={memberForm.role}
+                        onChange={(e) => setMemberForm({ ...memberForm, role: e.target.value })}
+                        placeholder="e.g., Manager, Developer, etc."
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      value={memberForm.status}
+                      onChange={(e) => setMemberForm({ ...memberForm, status: e.target.value })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                    </select>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button variant="outline" type="button" onClick={closeAddMemberModal}>Cancel</Button>
+                    <Button variant="primary" type="submit" loading={memberSubmitting}>
+                      {memberSubmitting ? "Adding..." : "Add Member"}
                     </Button>
                   </div>
                 </form>

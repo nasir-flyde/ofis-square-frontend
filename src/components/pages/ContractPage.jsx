@@ -130,6 +130,7 @@ export function ContractPage() {
         setLoading(false);
         return;
       }
+      
       // Create contract with form data
       const contractData = {
         clientId,
@@ -148,31 +149,29 @@ export function ContractPage() {
       }
       
       const { data } = await api.post("/api/contracts", contractData);
+      const contractId = data.contract._id;
       
-      // Store building information for allocation phase
-      localStorage.setItem('ofis_selected_building_id', formData.buildingId);
-      localStorage.setItem('ofis_selected_building', JSON.stringify(selectedBuilding));
+      // Send contract for digital signature via Zoho Sign
+      const signResponse = await api.post(`/api/contracts/${contractId}/send-for-signature`);
       
-      // Generate and download PDF
-      const response = await api.get(`/api/contracts/${data.contract._id}/download-pdf`, {
-        responseType: 'blob'
-      });
+      if (signResponse.data.zohoSignRequestId) {
+        // Contract sent successfully for signature
+        setContractStatus("sent");
+        
+        // Store contract info for tracking
+        localStorage.setItem('ofis_contract_id', contractId);
+        localStorage.setItem('ofis_zoho_request_id', signResponse.data.zohoSignRequestId);
+        
+        // Navigate to dashboard after successful contract submission
+        setTimeout(() => {
+          navigate("/dashboard");
+        }, 2000);
+      } else {
+        throw new Error("Failed to send contract for signature");
+      }
       
-      // Create download link
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      const buildingName = selectedBuilding?.name || 'building';
-      link.setAttribute('download', `contract_${buildingName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      // Redirect to upload signed contract page
-      navigate(`/upload-signed-contract/${data.contract._id}`);
     } catch (error) {
-      setErrors({ general: error.response?.data?.error || "Failed to generate contract. Please try again." });
+      setErrors({ general: error.response?.data?.error || "Failed to process contract. Please try again." });
     } finally {
       setLoading(false);
     }
@@ -365,16 +364,22 @@ export function ContractPage() {
               </form>
             )}
 
-            {contractStatus === "pending" && (
+            {contractStatus === "sent" && (
               <div className="text-center py-8">
                 <svg className="mx-auto h-16 w-16 text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <h3 className="text-lg font-medium text-gray-900 mb-2">Contract Generated Successfully!</h3>
-                <p className="text-gray-600 mb-6">Your contract PDF has been downloaded. Please review and sign it, then proceed to cabin allocation.</p>
-                <Button onClick={() => navigate("/allocation")} variant="primary">
-                  Continue to Cabin Allocation
-                </Button>
+                <h3 className="text-lg font-medium text-gray-900 mb-2">Contract Sent for Digital Signature!</h3>
+                <p className="text-gray-600 mb-6">Your contract has been sent via Zoho Sign for digital signature. Please check your email to sign the document.</p>
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-blue-600">
+                    <strong>Next Steps:</strong><br/>
+                    1. Check your email for the Zoho Sign document<br/>
+                    2. Sign the contract digitally<br/>
+                    3. You'll be redirected to the dashboard shortly
+                  </p>
+                </div>
+                <p className="text-sm text-gray-500">Redirecting to dashboard...</p>
               </div>
             )}
 

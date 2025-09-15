@@ -20,6 +20,7 @@ import { InvoicesPage } from "./components/pages/InvoicesPage";
 import { TicketsPage } from "./components/pages/TicketsPage";
 import { UsersPage } from "./components/pages/UsersPage";
 import { PaymentsPage } from "./components/pages/PaymentsPage";
+import { MembersPage } from "./components/pages/MembersPage";
 import { MainLayout } from "./components/layout/MainLayout";
 import ReceptionDashboard from "./components/pages/ReceptionDashboard";
 import InviteVisitor from "./components/pages/InviteVisitor";
@@ -30,11 +31,12 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/auth" replace />} />
         <Route path="/auth" element={<AuthPage />} />
-        
-        {/* Routes without sidebar layout */}
-        
-        {/* Routes with sidebar layout */}
         <Route path="/dashboard" element={
+          <MainLayout>
+            <DashboardPage />
+          </MainLayout>
+        } />
+        <Route path="/details" element={
           <MainLayout>
             <DetailsPage />
           </MainLayout>
@@ -47,6 +49,11 @@ function App() {
         <Route path="/clients" element={
           <MainLayout>
             <ClientsPage />
+          </MainLayout>
+        } />
+        <Route path="/members" element={
+          <MainLayout>
+            <MembersPage />
           </MainLayout>
         } />
         <Route path="/cabins" element={
@@ -154,7 +161,6 @@ function App() {
         } />
 
         {/* Legacy routes without sidebar (if needed) */}
-        <Route path="/details" element={<DetailsPage />} />
       </Routes>
     </Router>
   );

@@ -174,7 +174,7 @@ export function KYCPage() {
         headers: { "Content-Type": "multipart/form-data" },
       });
 
-      // Navigate to contract page after successful upload
+      // Navigate to contract page after successful KYC upload
       navigate("/contract");
     } catch (error) {
       setError(error.response?.data?.error || "Failed to upload documents. Please try again.");
