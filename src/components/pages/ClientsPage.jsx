@@ -157,17 +157,24 @@ export function ClientsPage() {
   };
 
   const handleCompleteOnboarding = (client) => {
+    console.log('Complete Onboarding clicked for client:', client);
+    console.log('Client ID:', client._id);
+    
     const status = getOnboardingStatus(client);
+    console.log('Onboarding status:', status);
     
     switch (status.stage) {
       case 'basic-details':
+        localStorage.setItem('ofis_current_client_id', client._id);
         navigate(`/dashboard`);
         break;
       case 'kyc':
+        localStorage.setItem('ofis_current_client_id', client._id);
         navigate(`/kyc`);
         break;
       case 'contract':
         {
+          localStorage.setItem('ofis_current_client_id', client._id);
           const pendingContract = Array.isArray(client.contracts)
             ? client.contracts.find((c) => c.status === 'pending_signature')
             : null;
@@ -187,6 +194,7 @@ export function ClientsPage() {
             localStorage.setItem('ofis_selected_building', JSON.stringify(buildingData));
           }
           localStorage.setItem('ofis_current_client_id', client._id);
+          console.log('Setting client ID in localStorage:', client._id);
           navigate(`/allocation`);
         }
         break;
