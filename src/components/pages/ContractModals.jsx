@@ -135,14 +135,74 @@ export function ContractModal({
               {selectedContract?.fileUrl && (
                 <div>
                   <label className="text-sm font-medium text-gray-500">Signed Contract File</label>
-                  <a
-                    href={selectedContract.fileUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-blue-600 hover:underline break-all"
-                  >
-                    {selectedContract.fileUrl}
-                  </a>
+                  <div className="mt-2">
+                    {(() => {
+                      const fileUrl = selectedContract.fileUrl;
+                      
+                      // Check if it's a base64 image
+                      if (fileUrl.startsWith('data:image/')) {
+                        return (
+                          <div className="space-y-2">
+                            <img 
+                              src={fileUrl} 
+                              alt="Signed Contract" 
+                              className="max-w-full max-h-96 border border-gray-300 rounded-lg shadow-sm"
+                              style={{ objectFit: 'contain' }}
+                            />
+                            <p className="text-xs text-gray-500">Base64 encoded image</p>
+                          </div>
+                        );
+                      }
+                      
+                      // Check if it's a base64 PDF
+                      if (fileUrl.startsWith('data:application/pdf')) {
+                        return (
+                          <div className="space-y-2">
+                            <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
+                              <p className="text-sm text-gray-700 mb-2">PDF Document (Base64 encoded)</p>
+                              <a
+                                href={fileUrl}
+                                download="signed_contract.pdf"
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+                              >
+                                Download PDF
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      // For regular URLs or other base64 types
+                      if (fileUrl.startsWith('data:')) {
+                        return (
+                          <div className="space-y-2">
+                            <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
+                              <p className="text-sm text-gray-700 mb-2">Base64 encoded file</p>
+                              <a
+                                href={fileUrl}
+                                download="signed_contract"
+                                className="inline-flex items-center px-3 py-2 text-sm font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-md hover:bg-blue-100"
+                              >
+                                Download File
+                              </a>
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      // Regular URL - show as link
+                      return (
+                        <a
+                          href={fileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-blue-600 hover:underline break-all"
+                        >
+                          {fileUrl}
+                        </a>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
             </div>
@@ -255,14 +315,56 @@ export function ContractModal({
                       Current Signed File
                     </label>
                     {selectedContract?.fileUrl ? (
-                      <a
-                        href={selectedContract.fileUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-blue-600 hover:underline break-all"
-                      >
-                        {selectedContract.fileUrl}
-                      </a>
+                      <div className="mt-2">
+                        {(() => {
+                          const fileUrl = selectedContract.fileUrl;
+                          
+                          // Check if it's a base64 image
+                          if (fileUrl.startsWith('data:image/')) {
+                            return (
+                              <div className="space-y-2">
+                                <img 
+                                  src={fileUrl} 
+                                  alt="Current Signed Contract" 
+                                  className="max-w-full max-h-32 border border-gray-300 rounded-lg shadow-sm"
+                                  style={{ objectFit: 'contain' }}
+                                />
+                                <p className="text-xs text-gray-500">Current base64 image</p>
+                              </div>
+                            );
+                          }
+                          
+                          // Check if it's a base64 PDF
+                          if (fileUrl.startsWith('data:application/pdf')) {
+                            return (
+                              <div className="p-3 border border-gray-300 rounded-lg bg-gray-50">
+                                <p className="text-sm text-gray-700">Current PDF (Base64)</p>
+                              </div>
+                            );
+                          }
+                          
+                          // For other base64 types
+                          if (fileUrl.startsWith('data:')) {
+                            return (
+                              <div className="p-3 border border-gray-300 rounded-lg bg-gray-50">
+                                <p className="text-sm text-gray-700">Current base64 file</p>
+                              </div>
+                            );
+                          }
+                          
+                          // Regular URL
+                          return (
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 hover:underline break-all"
+                            >
+                              {fileUrl}
+                            </a>
+                          );
+                        })()}
+                      </div>
                     ) : (
                       <p className="text-gray-500">No signed file uploaded yet</p>
                     )}
