@@ -59,7 +59,7 @@ export function InvoicesPage() {
   useEffect(() => {
     const filtered = invoices.filter(invoice =>
       (invoice.client?.companyName || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (invoice.invoiceNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (invoice.invoice_number || invoice.invoiceNumber || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (invoice.status || "").toLowerCase().includes(searchTerm.toLowerCase())
     );
     setFilteredInvoices(filtered);
@@ -103,7 +103,7 @@ export function InvoicesPage() {
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `invoice_${invoice.invoiceNumber?.replace(/[^a-zA-Z0-9]/g, '_') || 'invoice'}.pdf`);
+      link.setAttribute('download', `invoice_${(invoice.invoice_number || invoice.invoiceNumber)?.replace(/[^a-zA-Z0-9]/g, '_') || 'invoice'}.pdf`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -115,7 +115,7 @@ export function InvoicesPage() {
   };
 
   const handleDelete = async (invoice) => {
-    if (!window.confirm(`Are you sure you want to delete invoice "${invoice.invoiceNumber}"? This action cannot be undone.`)) {
+    if (!window.confirm(`Are you sure you want to delete invoice "${invoice.invoice_number || invoice.invoiceNumber}"? This action cannot be undone.`)) {
       return;
     }
 
@@ -261,7 +261,7 @@ export function InvoicesPage() {
                       <div className="flex items-center justify-center">
                         <FileText size={14} className="mr-2 text-gray-400" />
                         <span className="text-sm font-medium text-gray-900">
-                          {invoice.invoiceNumber || "N/A"}
+                          {invoice.invoice_number || invoice.invoiceNumber || "N/A"}
                         </span>
                       </div>
                     </td>
@@ -281,7 +281,7 @@ export function InvoicesPage() {
                           {invoice.total?.toLocaleString() || "0"}
                         </div>
                         <div className="text-sm text-gray-500">
-                          Paid: ₹{invoice.amountPaid?.toLocaleString() || "0"}
+                          Paid: ₹{(invoice.amount_paid || invoice.amountPaid || 0).toLocaleString()}
                         </div>
                       </div>
                     </td>
@@ -289,9 +289,9 @@ export function InvoicesPage() {
                       <div className="flex items-center text-sm text-gray-900 justify-center">
                         <Calendar size={14} className="mr-1 text-gray-400" />
                         <div>
-                          <div>Issued: {new Date(invoice.issueDate).toLocaleDateString()}</div>
+                          <div>Issued: {new Date(invoice.date || invoice.issueDate).toLocaleDateString()}</div>
                           <div className="text-xs text-gray-500">
-                            Due: {new Date(invoice.dueDate).toLocaleDateString()}
+                            Due: {new Date(invoice.due_date || invoice.dueDate).toLocaleDateString()}
                           </div>
                         </div>
                       </div>
@@ -343,7 +343,7 @@ export function InvoicesPage() {
               <div className="p-6 border-b border-gray-200">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-bold text-gray-900">
-                    Invoice Details - {selectedInvoice.invoiceNumber}
+                    Invoice Details - {selectedInvoice.invoice_number || selectedInvoice.invoiceNumber}
                   </h2>
                   <button
                     onClick={handleCloseModal}
@@ -380,7 +380,7 @@ export function InvoicesPage() {
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm font-medium text-gray-500">Invoice Number</label>
-                          <p className="text-gray-900">{selectedInvoice.invoiceNumber}</p>
+                          <p className="text-gray-900">{selectedInvoice.invoice_number || selectedInvoice.invoiceNumber}</p>
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Status</label>
@@ -392,7 +392,7 @@ export function InvoicesPage() {
                         </div>
                         <div>
                           <label className="text-sm font-medium text-gray-500">Amount Paid</label>
-                          <p className="text-gray-900">₹{selectedInvoice.amountPaid?.toLocaleString() || "0"}</p>
+                          <p className="text-gray-900">₹{(selectedInvoice.amount_paid || selectedInvoice.amountPaid || 0).toLocaleString()}</p>
                         </div>
                       </div>
                     </div>
@@ -401,26 +401,26 @@ export function InvoicesPage() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Issue Date</label>
-                      <p className="text-gray-900">{new Date(selectedInvoice.issueDate).toLocaleDateString()}</p>
+                      <p className="text-gray-900">{new Date(selectedInvoice.date || selectedInvoice.issueDate).toLocaleDateString()}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Due Date</label>
-                      <p className="text-gray-900">{new Date(selectedInvoice.dueDate).toLocaleDateString()}</p>
+                      <p className="text-gray-900">{new Date(selectedInvoice.due_date || selectedInvoice.dueDate).toLocaleDateString()}</p>
                     </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="text-sm font-medium text-gray-500">Billing Period Start</label>
-                      <p className="text-gray-900">{new Date(selectedInvoice.billingPeriod?.start).toLocaleDateString()}</p>
+                      <p className="text-gray-900">{new Date((selectedInvoice.billing_period || selectedInvoice.billingPeriod)?.start).toLocaleDateString()}</p>
                     </div>
                     <div>
                       <label className="text-sm font-medium text-gray-500">Billing Period End</label>
-                      <p className="text-gray-900">{new Date(selectedInvoice.billingPeriod?.end).toLocaleDateString()}</p>
+                      <p className="text-gray-900">{new Date((selectedInvoice.billing_period || selectedInvoice.billingPeriod)?.end).toLocaleDateString()}</p>
                     </div>
                   </div>
 
-                  {selectedInvoice.items && selectedInvoice.items.length > 0 && (
+                  {((selectedInvoice.line_items && selectedInvoice.line_items.length > 0) || (selectedInvoice.items && selectedInvoice.items.length > 0)) && (
                     <div>
                       <label className="text-sm font-medium text-gray-500 mb-3 block">Invoice Items</label>
                       <div className="border rounded-lg overflow-hidden">
@@ -434,12 +434,12 @@ export function InvoicesPage() {
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-200">
-                            {selectedInvoice.items.map((item, index) => (
+                            {(selectedInvoice.line_items || selectedInvoice.items || []).map((item, index) => (
                               <tr key={index}>
-                                <td className="px-4 py-2 text-sm text-gray-900">{item.description}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{item.description || item.name}</td>
                                 <td className="px-4 py-2 text-sm text-gray-900">{item.quantity}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">₹{item.unitPrice?.toLocaleString()}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">₹{item.amount?.toLocaleString()}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">₹{(item.rate || item.unitPrice || 0).toLocaleString()}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">₹{(item.item_total || item.amount || 0).toLocaleString()}</td>
                               </tr>
                             ))}
                           </tbody>

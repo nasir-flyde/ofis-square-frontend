@@ -185,7 +185,11 @@ export function CreateInvoicePage() {
       const { data } = await api.post('/api/invoices', payload);
       
       // Success - redirect back to invoices list
-      alert('Invoice created successfully!');
+      if (data.success) {
+        alert('Invoice created successfully and automatically pushed to Zoho Books!');
+      } else {
+        alert('Invoice created successfully!');
+      }
       navigate('/invoices');
     } catch (error) {
       setErrors({ 
@@ -205,7 +209,8 @@ export function CreateInvoicePage() {
           <CardHeader>
             <CardTitle>Invoice Management</CardTitle>
             <CardDescription>
-              Create and manage invoices manually (contract invoices are auto-generated)
+              Create and manage invoices manually (contract invoices are auto-generated). 
+              Invoices will be automatically pushed to Zoho Books if the client has a Zoho contact ID.
             </CardDescription>
           </CardHeader>
           
@@ -253,7 +258,18 @@ export function CreateInvoicePage() {
               {/* Client Details */}
               {selectedClient && (
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <h4 className="font-medium text-blue-900 mb-2">Client Details</h4>
+                  <div className="flex justify-between items-start mb-2">
+                    <h4 className="font-medium text-blue-900">Client Details</h4>
+                    {selectedClient.zohoBooksContactId ? (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        ✓ Zoho Integrated
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                        ⚠ No Zoho Integration
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-blue-800 space-y-1">
                     <div>Company: {selectedClient.companyName}</div>
                     <div>Contact: {selectedClient.contactPerson}</div>
