@@ -11,27 +11,74 @@ export function CreateInvoicePage() {
   
   const [formData, setFormData] = useState({
     client: '',
+    guest: '',
     contract: '',
-    billingPeriod: {
+    building: '',
+    cabin: '',
+    reference_number: '',
+    date: new Date().toISOString().split('T')[0],
+    due_date: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
+    billing_period: {
       start: new Date().toISOString().split('T')[0],
       end: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0]
     },
-    issueDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30*24*60*60*1000).toISOString().split('T')[0],
-    items: [{
+    customer_id: '',
+    gst_treatment: '',
+    place_of_supply: '',
+    gst_no: '',
+    line_items: [{
       description: 'Monthly Cabin Rent',
       quantity: 1,
-      unitPrice: 15000
+      unitPrice: 15000,
+      amount: 15000,
+      name: 'Monthly Cabin Rent',
+      rate: 15000,
+      unit: 'month',
+      tax_id: '',
+      tax_name: 'GST',
+      tax_type: 'tax',
+      tax_percentage: 18,
+      item_total: 15000
     }],
-    discount: {
-      type: 'flat',
-      value: 0
+    sub_total: 0,
+    discount: 0,
+    discount_type: 'entity_level',
+    tax_total: 0,
+    total: 0,
+    balance: 0,
+    amount_paid: 0,
+    currency_code: 'INR',
+    exchange_rate: 1,
+    salesperson_name: '',
+    notes: '',
+    terms: '',
+    status: 'draft',
+    payment_terms: 30,
+    payment_terms_label: 'Net 30',
+    shipping_charge: 0,
+    adjustment: 0,
+    adjustment_description: '',
+    is_inclusive_tax: false,
+    billing_address: {
+      attention: '',
+      address: '',
+      street2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'India',
+      phone: ''
     },
-    taxes: [{
-      name: 'GST',
-      rate: 18
-    }],
-    notes: ''
+    shipping_address: {
+      attention: '',
+      address: '',
+      street2: '',
+      city: '',
+      state: '',
+      zip: '',
+      country: 'India',
+      phone: ''
+    }
   });
   
   const [errors, setErrors] = useState({});
@@ -92,48 +139,89 @@ export function CreateInvoicePage() {
   };
 
   const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.items];
+    const newItems = [...formData.line_items];
     newItems[index] = { ...newItems[index], [field]: value };
-    setFormData(prev => ({ ...prev, items: newItems }));
+    
+    // Auto-calculate amount and item_total when quantity or unitPrice changes
+    if (field === 'quantity' || field === 'unitPrice') {
+      const quantity = field === 'quantity' ? Number(value) : Number(newItems[index].quantity);
+      const unitPrice = field === 'unitPrice' ? Number(value) : Number(newItems[index].unitPrice);
+      const amount = quantity * unitPrice;
+      newItems[index].amount = amount;
+      newItems[index].item_total = amount;
+      newItems[index].rate = unitPrice;
+    }
+    
+    // Update name when description changes
+    if (field === 'description') {
+      newItems[index].name = value;
+    }
+    
+    setFormData(prev => ({ ...prev, line_items: newItems }));
   };
 
   const addItem = () => {
     setFormData(prev => ({
       ...prev,
-      items: [...prev.items, { description: '', quantity: 1, unitPrice: 0 }]
+      line_items: [...prev.line_items, { 
+        description: '', 
+        quantity: 1, 
+        unitPrice: 0,
+        amount: 0,
+        name: '',
+        rate: 0,
+        unit: 'month',
+        tax_id: '',
+        tax_name: 'GST',
+        tax_type: 'tax',
+        tax_percentage: 18,
+        item_total: 0
+      }]
     }));
   };
 
   const removeItem = (index) => {
-    if (formData.items.length > 1) {
-      const newItems = formData.items.filter((_, i) => i !== index);
-      setFormData(prev => ({ ...prev, items: newItems }));
+    if (formData.line_items.length > 1) {
+      const newItems = formData.line_items.filter((_, i) => i !== index);
+      setFormData(prev => ({ ...prev, line_items: newItems }));
     }
   };
 
   const calculateTotals = () => {
-    const subtotal = formData.items.reduce((sum, item) => {
+    const subtotal = formData.line_items.reduce((sum, item) => {
       return sum + (Number(item.quantity) * Number(item.unitPrice));
     }, 0);
 
-    let discountAmount = 0;
-    if (formData.discount.type === 'percent') {
-      discountAmount = (subtotal * Number(formData.discount.value)) / 100;
-    } else {
-      discountAmount = Number(formData.discount.value);
-    }
-
+    const discountAmount = Number(formData.discount || 0);
     const taxableBase = subtotal - discountAmount;
-    const taxAmount = (taxableBase * Number(formData.taxes[0]?.rate || 0)) / 100;
-    const total = taxableBase + taxAmount;
+    
+    // Calculate tax based on line items tax percentage (assuming uniform tax)
+    const taxPercentage = formData.line_items[0]?.tax_percentage || 18;
+    const taxAmount = (taxableBase * taxPercentage) / 100;
+    const total = taxableBase + taxAmount + Number(formData.shipping_charge || 0) + Number(formData.adjustment || 0);
 
     return {
       subtotal: subtotal.toFixed(2),
       discountAmount: discountAmount.toFixed(2),
       taxAmount: taxAmount.toFixed(2),
-      total: total.toFixed(2)
+      total: total.toFixed(2),
+      rawSubtotal: subtotal,
+      rawTaxAmount: taxAmount,
+      rawTotal: total
     };
   };
+
+  // Update calculated fields when relevant data changes
+  useEffect(() => {
+    const totals = calculateTotals();
+    setFormData(prev => ({
+      ...prev,
+      sub_total: totals.rawSubtotal,
+      tax_total: totals.rawTaxAmount,
+      total: totals.rawTotal,
+      balance: totals.rawTotal - Number(prev.amount_paid || 0)
+    }));
+  }, [formData.line_items, formData.discount, formData.shipping_charge, formData.adjustment]);
 
   const validateForm = () => {
     const newErrors = {};
@@ -142,16 +230,16 @@ export function CreateInvoicePage() {
       newErrors.client = 'Client is required';
     }
     
-    if (!formData.billingPeriod.start) {
-      newErrors['billingPeriod.start'] = 'Billing period start date is required';
+    if (!formData.billing_period.start) {
+      newErrors['billing_period.start'] = 'Billing period start date is required';
     }
     
-    if (!formData.billingPeriod.end) {
-      newErrors['billingPeriod.end'] = 'Billing period end date is required';
+    if (!formData.billing_period.end) {
+      newErrors['billing_period.end'] = 'Billing period end date is required';
     }
 
-    if (formData.items.some(item => !item.description || !item.quantity || !item.unitPrice)) {
-      newErrors.items = 'All items must have description, quantity, and unit price';
+    if (formData.line_items.some(item => !item.description || !item.quantity || !item.unitPrice)) {
+      newErrors.line_items = 'All items must have description, quantity, and unit price';
     }
 
     setErrors(newErrors);
@@ -167,24 +255,27 @@ export function CreateInvoicePage() {
     try {
       const payload = {
         ...formData,
-        items: formData.items.map(item => ({
+        line_items: formData.line_items.map(item => ({
           ...item,
           quantity: Number(item.quantity),
-          unitPrice: Number(item.unitPrice)
+          unitPrice: Number(item.unitPrice),
+          amount: Number(item.quantity) * Number(item.unitPrice),
+          rate: Number(item.unitPrice),
+          item_total: Number(item.quantity) * Number(item.unitPrice),
+          tax_percentage: Number(item.tax_percentage)
         })),
-        discount: {
-          ...formData.discount,
-          value: Number(formData.discount.value)
-        },
-        taxes: formData.taxes.map(tax => ({
-          ...tax,
-          rate: Number(tax.rate)
-        }))
+        discount: Number(formData.discount),
+        sub_total: Number(formData.sub_total),
+        tax_total: Number(formData.tax_total),
+        total: Number(formData.total),
+        balance: Number(formData.balance),
+        shipping_charge: Number(formData.shipping_charge),
+        adjustment: Number(formData.adjustment),
+        payment_terms: Number(formData.payment_terms),
+        exchange_rate: Number(formData.exchange_rate)
       };
 
       const { data } = await api.post('/api/invoices', payload);
-      
-      // Success - redirect back to invoices list
       if (data.success) {
         alert('Invoice created successfully and automatically pushed to Zoho Books!');
       } else {
@@ -283,21 +374,21 @@ export function CreateInvoicePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Billing Period Start"
-                  name="billingPeriod.start"
+                  name="billing_period.start"
                   type="date"
-                  value={formData.billingPeriod.start}
+                  value={formData.billing_period.start}
                   onChange={handleChange}
-                  error={errors['billingPeriod.start']}
+                  error={errors['billing_period.start']}
                   required
                 />
 
                 <Input
                   label="Billing Period End"
-                  name="billingPeriod.end"
+                  name="billing_period.end"
                   type="date"
-                  value={formData.billingPeriod.end}
+                  value={formData.billing_period.end}
                   onChange={handleChange}
-                  error={errors['billingPeriod.end']}
+                  error={errors['billing_period.end']}
                   required
                 />
               </div>
@@ -306,20 +397,52 @@ export function CreateInvoicePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Issue Date"
-                  name="issueDate"
+                  name="date"
                   type="date"
-                  value={formData.issueDate}
+                  value={formData.date}
                   onChange={handleChange}
                   required
                 />
 
                 <Input
                   label="Due Date"
-                  name="dueDate"
+                  name="due_date"
                   type="date"
-                  value={formData.dueDate}
+                  value={formData.due_date}
                   onChange={handleChange}
                   required
+                />
+              </div>
+
+              {/* Additional Fields */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Input
+                  label="Reference Number"
+                  name="reference_number"
+                  value={formData.reference_number}
+                  onChange={handleChange}
+                  placeholder="Optional reference"
+                />
+
+                <Select
+                  label="GST Treatment"
+                  name="gst_treatment"
+                  value={formData.gst_treatment}
+                  onChange={handleChange}
+                >
+                  <option value="">Select GST Treatment</option>
+                  <option value="business_gst">Business GST</option>
+                  <option value="business_none">Business None</option>
+                  <option value="overseas">Overseas</option>
+                  <option value="consumer">Consumer</option>
+                </Select>
+
+                <Input
+                  label="Place of Supply"
+                  name="place_of_supply"
+                  value={formData.place_of_supply}
+                  onChange={handleChange}
+                  placeholder="e.g., Karnataka"
                 />
               </div>
 
@@ -334,12 +457,12 @@ export function CreateInvoicePage() {
                   </Button>
                 </div>
                 
-                {errors.items && (
-                  <p className="text-sm text-red-600 mb-2">{errors.items}</p>
+                {errors.line_items && (
+                  <p className="text-sm text-red-600 mb-2">{errors.line_items}</p>
                 )}
 
                 <div className="space-y-3">
-                  {formData.items.map((item, index) => (
+                  {formData.line_items.map((item, index) => (
                     <div key={index} className="grid grid-cols-12 gap-3 items-end">
                       <div className="col-span-5">
                         <Input
@@ -374,7 +497,7 @@ export function CreateInvoicePage() {
                         <span className="text-sm font-medium">
                           ₹{(Number(item.quantity) * Number(item.unitPrice)).toFixed(2)}
                         </span>
-                        {formData.items.length > 1 && (
+                        {formData.line_items.length > 1 && (
                           <Button
                             type="button"
                             variant="secondary"
@@ -391,37 +514,74 @@ export function CreateInvoicePage() {
               </div>
 
               {/* Discount and Tax */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <Select
                   label="Discount Type"
-                  name="discount.type"
-                  value={formData.discount.type}
+                  name="discount_type"
+                  value={formData.discount_type}
                   onChange={handleChange}
                 >
-                  <option value="flat">Flat Amount</option>
-                  <option value="percent">Percentage</option>
+                  <option value="entity_level">Entity Level</option>
+                  <option value="item_level">Item Level</option>
                 </Select>
 
                 <Input
-                  label={`Discount ${formData.discount.type === 'percent' ? '(%)' : '(₹)'}`}
-                  name="discount.value"
+                  label="Discount Amount (₹)"
+                  name="discount"
                   type="number"
                   step="0.01"
-                  value={formData.discount.value}
+                  value={formData.discount}
                   onChange={handleChange}
                 />
 
+                <Input
+                  label="Shipping Charge (₹)"
+                  name="shipping_charge"
+                  type="number"
+                  step="0.01"
+                  value={formData.shipping_charge}
+                  onChange={handleChange}
+                />
+
+                <Input
+                  label="Adjustment (₹)"
+                  name="adjustment"
+                  type="number"
+                  step="0.01"
+                  value={formData.adjustment}
+                  onChange={handleChange}
+                />
+              </div>
+
+              {/* Tax Configuration */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <Input
                   label="Tax Rate (%)"
                   type="number"
                   step="0.01"
-                  value={formData.taxes[0]?.rate || 18}
+                  value={formData.line_items[0]?.tax_percentage || 18}
                   onChange={(e) => {
-                    const newTaxes = [...formData.taxes];
-                    newTaxes[0] = { ...newTaxes[0], rate: e.target.value };
-                    setFormData(prev => ({ ...prev, taxes: newTaxes }));
+                    const newItems = [...formData.line_items];
+                    newItems.forEach(item => {
+                      item.tax_percentage = Number(e.target.value);
+                    });
+                    setFormData(prev => ({ ...prev, line_items: newItems }));
                   }}
                 />
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="is_inclusive_tax"
+                    name="is_inclusive_tax"
+                    checked={formData.is_inclusive_tax}
+                    onChange={(e) => setFormData(prev => ({ ...prev, is_inclusive_tax: e.target.checked }))}
+                    className="mr-2"
+                  />
+                  <label htmlFor="is_inclusive_tax" className="text-sm font-medium text-gray-700">
+                    Tax Inclusive Pricing
+                  </label>
+                </div>
               </div>
 
               {/* Invoice Summary */}
@@ -437,7 +597,15 @@ export function CreateInvoicePage() {
                     <span>-₹{totals.discountAmount}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax ({formData.taxes[0]?.rate || 18}%):</span>
+                    <span>Shipping Charge:</span>
+                    <span>₹{Number(formData.shipping_charge || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Adjustment:</span>
+                    <span>₹{Number(formData.adjustment || 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax ({formData.line_items[0]?.tax_percentage || 18}%):</span>
                     <span>₹{totals.taxAmount}</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between font-semibold">
@@ -447,15 +615,46 @@ export function CreateInvoicePage() {
                 </div>
               </div>
 
-              {/* Notes */}
-              <Textarea
-                label="Notes (Optional)"
-                name="notes"
-                value={formData.notes}
-                onChange={handleChange}
-                placeholder="Additional invoice notes..."
-                rows={3}
-              />
+              {/* Payment Terms */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Input
+                  label="Payment Terms (Days)"
+                  name="payment_terms"
+                  type="number"
+                  value={formData.payment_terms}
+                  onChange={handleChange}
+                  placeholder="30"
+                />
+
+                <Input
+                  label="Payment Terms Label"
+                  name="payment_terms_label"
+                  value={formData.payment_terms_label}
+                  onChange={handleChange}
+                  placeholder="Net 30"
+                />
+              </div>
+
+              {/* Notes and Terms */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <Textarea
+                  label="Notes (Optional)"
+                  name="notes"
+                  value={formData.notes}
+                  onChange={handleChange}
+                  placeholder="Additional invoice notes..."
+                  rows={3}
+                />
+
+                <Textarea
+                  label="Terms & Conditions (Optional)"
+                  name="terms"
+                  value={formData.terms}
+                  onChange={handleChange}
+                  placeholder="Terms and conditions..."
+                  rows={3}
+                />
+              </div>
 
               <div className="flex justify-between">
                 <Button

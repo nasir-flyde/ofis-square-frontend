@@ -28,6 +28,10 @@ export function ClientsPage() {
   const [cabinsLoading, setCabinsLoading] = useState(false);
   const [invoices, setInvoices] = useState([]);
   const [invoicesLoading, setInvoicesLoading] = useState(false);
+  // Credit summary state for selected client
+  const [creditSummary, setCreditSummary] = useState(null);
+  const [creditLoading, setCreditLoading] = useState(false);
+  const [creditError, setCreditError] = useState("");
 
   const [showBookingModal, setShowBookingModal] = useState(false);
   const [rooms, setRooms] = useState([]);
@@ -449,6 +453,26 @@ export function ClientsPage() {
     loadMembers();
   }, [selectedClient, loadMembers]);
 
+  useEffect(() => {
+    const fetchCreditSummary = async () => {
+      if (!selectedClient) return;
+      try {
+        setCreditLoading(true);
+        setCreditError("");
+        const resp = await api.get(`/api/credits/summary/${selectedClient._id}`);
+        setCreditSummary(resp?.data?.data || resp?.data || null);
+      } catch (e) {
+        setCreditSummary(null);
+        setCreditError(e?.response?.data?.message || e?.message || "Failed to load credit summary");
+      } finally {
+        setCreditLoading(false);
+      }
+    };
+    if (showDetailsModal && activeTab === "overview") {
+      fetchCreditSummary();
+    }
+  }, [showDetailsModal, activeTab, selectedClient, api]);
+
   if (loading) {
     return (
       <div className="p-6">
@@ -797,6 +821,177 @@ export function ClientsPage() {
                       <h3 className="text-lg font-semibold text-gray-900 mb-4">Company Address</h3>
                       <p className="text-gray-900">{selectedClient.companyAddress || "Not provided"}</p>
                     </div>
+
+                    {/* Commercial Details */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Commercial Details</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Contact Type</label>
+                          <p className="text-gray-900">{selectedClient.contactType || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Customer Sub-Type</label>
+                          <p className="text-gray-900">{selectedClient.customerSubType || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Credit Limit (₹)</label>
+                          <p className="text-gray-900">{selectedClient.creditLimit != null ? Number(selectedClient.creditLimit).toLocaleString() : "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Payment Terms</label>
+                          <p className="text-gray-900">{selectedClient.paymentTerms != null ? `${selectedClient.paymentTerms} days` : "—"} {selectedClient.paymentTermsLabel ? `(${selectedClient.paymentTermsLabel})` : ""}</p>
+                        </div>
+                        {selectedClient.notes && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500">Notes</label>
+                            <p className="text-gray-900 whitespace-pre-wrap">{selectedClient.notes}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Tax Details */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Tax Details</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">GST Number</label>
+                          <p className="text-gray-900">{selectedClient.gstNo || selectedClient.gstNumber || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">GST Treatment</label>
+                          <p className="text-gray-900">{selectedClient.gstTreatment || "—"}</p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-500">Taxable</label>
+                          <p className="text-gray-900">{selectedClient.isTaxable === false ? "No" : "Yes"}</p>
+                        </div>
+                        {selectedClient.taxRegNo && (
+                          <div>
+                            <label className="text-sm font-medium text-gray-500">Tax Registration No.</label>
+                            <p className="text-gray-900">{selectedClient.taxRegNo}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Billing Address */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Billing Address</h3>
+                      {selectedClient.billingAddress ? (
+                        <div className="text-gray-900 text-sm space-y-1">
+                          <p>{selectedClient.billingAddress.attention || ""}</p>
+                          <p>{selectedClient.billingAddress.address || ""}</p>
+                          {selectedClient.billingAddress.street2 && <p>{selectedClient.billingAddress.street2}</p>}
+                          <p>{[selectedClient.billingAddress.city, selectedClient.billingAddress.state, selectedClient.billingAddress.zip].filter(Boolean).join(", ")}</p>
+                          <p>{selectedClient.billingAddress.country || ""}</p>
+                          {selectedClient.billingAddress.phone && <p>Phone: {selectedClient.billingAddress.phone}</p>}
+                        </div>
+                      ) : (
+                        <p className="text-gray-900">—</p>
+                      )}
+                    </div>
+
+                    {/* Shipping Address */}
+                    <div>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Shipping Address</h3>
+                      {selectedClient.shippingAddress ? (
+                        <div className="text-gray-900 text-sm space-y-1">
+                          <p>{selectedClient.shippingAddress.attention || ""}</p>
+                          <p>{selectedClient.shippingAddress.address || ""}</p>
+                          {selectedClient.shippingAddress.street2 && <p>{selectedClient.shippingAddress.street2}</p>}
+                          <p>{[selectedClient.shippingAddress.city, selectedClient.shippingAddress.state, selectedClient.shippingAddress.zip].filter(Boolean).join(", ")}</p>
+                          <p>{selectedClient.shippingAddress.country || ""}</p>
+                          {selectedClient.shippingAddress.phone && <p>Phone: {selectedClient.shippingAddress.phone}</p>}
+                        </div>
+                      ) : (
+                        <p className="text-gray-900">—</p>
+                      )}
+                    </div>
+
+                    {/* Contact Persons */}
+                    <div className="md:col-span-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Contact Persons</h3>
+                      {Array.isArray(selectedClient.contactPersons) && selectedClient.contactPersons.length > 0 ? (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-50 border-b border-gray-200">
+                              <tr>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Designation</th>
+                                <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Primary</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {selectedClient.contactPersons.map((cp, idx) => (
+                                <tr key={idx} className="hover:bg-gray-50">
+                                  <td className="px-4 py-2 text-sm text-gray-900">{[cp.first_name, cp.last_name].filter(Boolean).join(" ") || cp.salutation || "—"}</td>
+                                  <td className="px-4 py-2 text-sm text-gray-900">{cp.email || "—"}</td>
+                                  <td className="px-4 py-2 text-sm text-gray-900">{cp.phone || cp.mobile || "—"}</td>
+                                  <td className="px-4 py-2 text-sm text-gray-900">{cp.designation || cp.department || "—"}</td>
+                                  <td className="px-4 py-2 text-sm text-gray-900">{cp.is_primary_contact ? "Yes" : "No"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <p className="text-gray-900">—</p>
+                      )}
+                    </div>
+
+                    {/* External IDs */}
+                    <div className="md:col-span-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">External IDs</h3>
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Zoho Books Contact ID</p>
+                          <p className="text-gray-900">{selectedClient.zohoBooksContactId || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Pricebook ID</p>
+                          <p className="text-gray-900">{selectedClient.pricebookId || "—"}</p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Currency ID</p>
+                          <p className="text-gray-900">{selectedClient.currencyId || "—"}</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Credit Summary */}
+                    <div className="md:col-span-2">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-4">Credit Summary</h3>
+                      {creditLoading ? (
+                        <p className="text-sm text-gray-600">Loading credit summary...</p>
+                      ) : creditError ? (
+                        <p className="text-sm text-red-600">{creditError}</p>
+                      ) : creditSummary ? (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs text-gray-500">Allocated</p>
+                            <p className="text-lg font-semibold text-gray-900">{creditSummary?.allocated || 0}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs text-gray-500">Used (This Month)</p>
+                            <p className="text-lg font-semibold text-gray-900">{creditSummary?.used || 0}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs text-gray-500">Available</p>
+                            <p className="text-lg font-semibold text-gray-900">{creditSummary?.available ?? ((creditSummary?.allocated || 0) - (creditSummary?.used || 0))}</p>
+                          </div>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <p className="text-xs text-gray-500">Exposure (₹)</p>
+                            <p className="text-lg font-semibold text-gray-900">{(creditSummary?.exposure_amount || 0).toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-gray-600">No credit data available.</p>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -860,12 +1055,12 @@ export function ClientsPage() {
                           <tbody className="bg-white divide-y divide-gray-200">
                             {invoices.map(inv => (
                               <tr key={inv._id} className="hover:bg-gray-50">
-                                <td className="px-4 py-2 text-sm text-gray-900">{inv.invoiceNumber || inv.zohoInvoiceNumber || inv._id.slice(-6)}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">{inv.issueDate ? new Date(inv.issueDate).toLocaleDateString() : "-"}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">{inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : "-"}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{inv.invoice_number || inv.zoho_invoice_number || inv.reference_number || inv._id.slice(-6)}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{inv.date ? new Date(inv.date).toLocaleDateString() : "-"}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : "-"}</td>
                                 <td className="px-4 py-2 text-sm text-gray-900">₹{Number(inv.total || 0).toLocaleString()}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">₹{Number(inv.amountPaid || 0).toLocaleString()}</td>
-                                <td className="px-4 py-2 text-sm text-gray-900">₹{Number(inv.balanceDue || 0).toLocaleString()}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">₹{Number(inv.amount_paid || 0).toLocaleString()}</td>
+                                <td className="px-4 py-2 text-sm text-gray-900">₹{Number(inv.balance || 0).toLocaleString()}</td>
                                 <td className="px-4 py-2 text-xs">
                                   <span className={`px-2 py-1 rounded-full ${inv.status === 'paid' ? 'bg-green-100 text-green-700' : inv.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
                                     {inv.status || 'issued'}

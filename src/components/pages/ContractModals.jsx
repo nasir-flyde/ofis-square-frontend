@@ -89,10 +89,7 @@ export function ContractModal({
                       <label className="text-sm font-medium text-gray-500">Monthly Rent</label>
                       <p className="text-gray-900">₹{selectedContract?.monthlyRent?.toLocaleString()}</p>
                     </div>
-                    <div>
-                      <label className="text-sm font-medium text-gray-500">Security Deposit</label>
-                      <p className="text-gray-900">₹{selectedContract?.securityDeposit?.toLocaleString() || "N/A"}</p>
-                    </div>
+                    {/* Security deposit removed */}
                     <div>
                       <label className="text-sm font-medium text-gray-500">Status</label>
                       <div className="mt-1">{getStatusBadge(selectedContract?.status)}</div>
@@ -294,18 +291,7 @@ export function ContractModal({
                   )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Security Deposit (₹)
-                  </label>
-                  <Input
-                    type="number"
-                    value={formData.securityDeposit}
-                    onChange={(e) => setFormData({ ...formData, securityDeposit: e.target.value })}
-                    placeholder="Security deposit amount"
-                    min="0"
-                  />
-                </div>
+                {/* Security deposit field removed */}
               </div>
 
               {modalMode === "edit" && (

@@ -36,7 +36,7 @@ export function PaymentsPage() {
   const [selectedPayment, setSelectedPayment] = useState(null);
   const [selectedDraft, setSelectedDraft] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [modalMode, setModalMode] = useState("view"); // view, create, edit, draft, approve, reject
+  const [modalMode, setModalMode] = useState("view"); // view, create, edit, draft, approve, reject, zoho-payment
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({ totalAmount: 0, totalPayments: 0, thisMonth: 0 });
@@ -58,6 +58,21 @@ export function PaymentsPage() {
     screenshots: []
   });
 
+  // Zoho customer payment specific state
+  const [zohoPaymentData, setZohoPaymentData] = useState({
+    clientId: "",
+    payment_mode: "BankTransfer",
+    amount: "",
+    date: "",
+    reference_number: "",
+    description: "",
+    deposit_to_account_id: "",
+    invoices: [] // Array of {invoiceId, amount_applied}
+  });
+
+  const [selectedInvoicesForPayment, setSelectedInvoicesForPayment] = useState([]);
+  const [clientInvoices, setClientInvoices] = useState([]);
+
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState([]);
@@ -71,6 +86,15 @@ export function PaymentsPage() {
     "Card",
     "Cheque",
     "Online Gateway"
+  ];
+
+  const zohoPaymentModes = [
+    { value: "BankTransfer", label: "Bank Transfer" },
+    { value: "Cash", label: "Cash" },
+    { value: "Check", label: "Cheque" },
+    { value: "CreditCard", label: "Credit Card" },
+    { value: "BankRemittance", label: "Bank Remittance" },
+    { value: "Others", label: "Others" }
   ];
 
   const fetchPayments = async () => {
@@ -190,6 +214,22 @@ export function PaymentsPage() {
     setSelectedPayment(null);
   };
 
+  const resetZohoForm = () => {
+    setZohoPaymentData({
+      clientId: "",
+      payment_mode: "BankTransfer",
+      amount: "",
+      date: "",
+      reference_number: "",
+      description: "",
+      deposit_to_account_id: "",
+      invoices: []
+    });
+    setSelectedInvoicesForPayment([]);
+    setClientInvoices([]);
+    setFormErrors({});
+  };
+
   const handleCreate = () => {
     resetForm();
     setModalMode("create");
@@ -199,6 +239,12 @@ export function PaymentsPage() {
   const handleCreateDraft = () => {
     resetForm();
     setModalMode("draft");
+    setShowModal(true);
+  };
+
+  const handleCreateZohoPayment = () => {
+    resetZohoForm();
+    setModalMode("zoho-payment");
     setShowModal(true);
   };
 
@@ -333,6 +379,116 @@ export function PaymentsPage() {
     }
   };
 
+  const handleZohoInputChange = (e) => {
+    const { name, value } = e.target;
+    setZohoPaymentData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+    
+    // Clear error for this field
+    if (formErrors[name]) {
+      setFormErrors(prev => ({
+        ...prev,
+        [name]: ""
+      }));
+    }
+
+    // If client changes, fetch their invoices
+    if (name === 'clientId' && value) {
+      fetchClientInvoices(value);
+    }
+  };
+
+  const fetchClientInvoices = async (clientId) => {
+    try {
+      const response = await api.get(`/api/invoices?client=${clientId}`);
+      if (response.data.success) {
+        // Filter invoices that have outstanding balance
+        const outstandingInvoices = response.data.data.filter(invoice => {
+          const balance = invoice.balance || invoice.total;
+          return balance > 0;
+        });
+        setClientInvoices(outstandingInvoices);
+      }
+    } catch (err) {
+      console.error('Error fetching client invoices:', err);
+      setError('Failed to fetch client invoices');
+    }
+  };
+
+  const handleInvoiceSelection = (invoiceId, checked) => {
+    if (checked) {
+      const invoice = clientInvoices.find(inv => inv._id === invoiceId);
+      const outstanding = invoice.balance || invoice.total;
+      setSelectedInvoicesForPayment(prev => [
+        ...prev,
+        {
+          invoiceId,
+          invoice_number: invoice.invoice_number || invoice.local_invoice_number,
+          outstanding_amount: outstanding,
+          amount_applied: outstanding
+        }
+      ]);
+    } else {
+      setSelectedInvoicesForPayment(prev => 
+        prev.filter(inv => inv.invoiceId !== invoiceId)
+      );
+    }
+  };
+
+  const updateInvoiceAmount = (invoiceId, amount) => {
+    setSelectedInvoicesForPayment(prev =>
+      prev.map(inv => 
+        inv.invoiceId === invoiceId 
+          ? { ...inv, amount_applied: Number(amount) }
+          : inv
+      )
+    );
+  };
+
+  const calculateTotalAmount = () => {
+    return selectedInvoicesForPayment.reduce((sum, inv) => sum + Number(inv.amount_applied || 0), 0);
+  };
+
+  const distributeAmountAcrossInvoices = (totalAmount) => {
+    if (selectedInvoicesForPayment.length === 0) return;
+    const totalOutstanding = selectedInvoicesForPayment.reduce((sum, inv) => sum + inv.outstanding_amount, 0);
+    const updatedInvoices = selectedInvoicesForPayment.map(inv => {
+      const proportion = inv.outstanding_amount / totalOutstanding;
+      const allocatedAmount = Math.min(totalAmount * proportion, inv.outstanding_amount);
+      return {
+        ...inv,
+        amount_applied: Math.round(allocatedAmount * 100) / 100
+      };
+    });
+
+    const currentTotal = updatedInvoices.reduce((sum, inv) => sum + inv.amount_applied, 0);
+    const difference = totalAmount - currentTotal;
+    
+    if (Math.abs(difference) > 0.01) {
+      const largestIndex = updatedInvoices.reduce((maxIdx, inv, idx) => 
+        inv.amount_applied > updatedInvoices[maxIdx].amount_applied ? idx : maxIdx, 0
+      );
+      updatedInvoices[largestIndex].amount_applied = Math.round((updatedInvoices[largestIndex].amount_applied + difference) * 100) / 100;
+    }
+
+    setSelectedInvoicesForPayment(updatedInvoices);
+  };
+
+  const distributeEvenly = () => {
+    if (!zohoPaymentData.amount || selectedInvoicesForPayment.length === 0) return;
+    distributeAmountAcrossInvoices(Number(zohoPaymentData.amount));
+  };
+
+  const autoFillAmount = () => {
+    const totalAllocated = calculateTotalAmount();
+    setZohoPaymentData(prev => ({
+      ...prev,
+      amount: totalAllocated.toString()
+    }));
+  };
+
   const handleFileUpload = (e) => {
     const files = Array.from(e.target.files);
     const maxFiles = 5;
@@ -386,6 +542,10 @@ export function PaymentsPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (modalMode === "zoho-payment") {
+      return handleZohoPaymentSubmit();
+    }
+    
     if (!validateForm()) return;
     
     try {
@@ -426,6 +586,72 @@ export function PaymentsPage() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleZohoPaymentSubmit = async () => {
+    if (!validateZohoForm()) return;
+    
+    try {
+      setSubmitting(true);
+      
+      const payload = {
+        clientId: zohoPaymentData.clientId,
+        payment_mode: zohoPaymentData.payment_mode,
+        amount: Number(zohoPaymentData.amount),
+        date: zohoPaymentData.date,
+        reference_number: zohoPaymentData.reference_number,
+        description: zohoPaymentData.description,
+        deposit_to_account_id: zohoPaymentData.deposit_to_account_id || undefined,
+        invoices: selectedInvoicesForPayment.map(inv => ({
+          invoiceId: inv.invoiceId,
+          amount_applied: inv.amount_applied
+        }))
+      };
+
+      const response = await api.post("/api/payments/zoho-customer-payment", payload);
+      if (response.data.success) {
+        setShowModal(false);
+        resetZohoForm();
+        fetchPayments(); // Refresh to get updated stats
+        setError(null);
+      }
+    } catch (err) {
+      console.error("Error creating Zoho payment:", err);
+      setError(err.response?.data?.message || "Failed to create Zoho customer payment");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const validateZohoForm = () => {
+    const errors = {};
+    
+    if (!zohoPaymentData.clientId) errors.clientId = "Client is required";
+    if (!zohoPaymentData.date) errors.date = "Payment date is required";
+    if (!zohoPaymentData.amount || Number(zohoPaymentData.amount) <= 0) errors.amount = "Amount must be greater than 0";
+    if (selectedInvoicesForPayment.length === 0) errors.invoices = "At least one invoice must be selected";
+    
+    // Validate that total allocated amount matches payment amount
+    const totalAllocated = calculateTotalAmount();
+    const paymentAmount = Number(zohoPaymentData.amount);
+    if (Math.abs(totalAllocated - paymentAmount) > 0.01) {
+      errors.amount = `Total allocated amount (₹${totalAllocated}) must equal payment amount (₹${paymentAmount})`;
+    }
+    
+    // Validate individual invoice amounts
+    for (const inv of selectedInvoicesForPayment) {
+      if (inv.amount_applied <= 0) {
+        errors.invoices = "All invoice amounts must be greater than 0";
+        break;
+      }
+      if (inv.amount_applied > inv.outstanding_amount) {
+        errors.invoices = "Payment amount cannot exceed outstanding balance";
+        break;
+      }
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
   };
 
   const getPaymentTypeBadge = (type) => {
@@ -556,6 +782,10 @@ export function PaymentsPage() {
                 Add Draft Transaction
               </Button>
             )}
+            <Button variant="outline" onClick={handleCreateZohoPayment}>
+              <Plus size={16} className="mr-2" />
+              Zoho Customer Payment
+            </Button>
             <Button variant="primary" onClick={handleCreate}>
               <Plus size={16} className="mr-2" />
               Create Payment
@@ -764,6 +994,7 @@ export function PaymentsPage() {
                   {modalMode === "create" ? "Create New Payment" : 
                    modalMode === "edit" ? "Edit Payment" :
                    modalMode === "draft" ? "Create Draft Transaction" :
+                   modalMode === "zoho-payment" ? "Zoho Customer Payment" :
                    modalMode === "viewDraft" ? "Draft Transaction Details" :
                    modalMode === "approve" ? "Approve Draft Transaction" :
                    modalMode === "reject" ? "Reject Draft Transaction" :
@@ -974,6 +1205,244 @@ export function PaymentsPage() {
                     </Button>
                   </div>
                 </div>
+              ) : modalMode === "zoho-payment" ? (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Client Selection */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Client *</label>
+                    <Select
+                      name="clientId"
+                      value={zohoPaymentData.clientId}
+                      onChange={handleZohoInputChange}
+                      className="mt-1"
+                    >
+                      <option value="">Select Client</option>
+                      {clients.map((client) => (
+                        <option key={client._id} value={client._id}>
+                          {client.companyName}
+                        </option>
+                      ))}
+                    </Select>
+                    {formErrors.clientId && <p className="text-red-500 text-xs mt-1">{formErrors.clientId}</p>}
+                  </div>
+
+                  {/* Payment Details */}
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Payment Date *</label>
+                      <Input
+                        type="date"
+                        name="date"
+                        value={zohoPaymentData.date}
+                        onChange={handleZohoInputChange}
+                        className="mt-1"
+                      />
+                      {formErrors.date && <p className="text-red-500 text-xs mt-1">{formErrors.date}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Amount *</label>
+                      <div className="flex space-x-2">
+                        <Input
+                          type="number"
+                          name="amount"
+                          value={zohoPaymentData.amount}
+                          onChange={handleZohoInputChange}
+                          step="0.01"
+                          min="0"
+                          className="mt-1 flex-1"
+                          placeholder="0.00"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={autoFillAmount}
+                          className="mt-1 text-xs"
+                        >
+                          Auto Fill
+                        </Button>
+                      </div>
+                      {formErrors.amount && <p className="text-red-500 text-xs mt-1">{formErrors.amount}</p>}
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Payment Mode</label>
+                      <Select
+                        name="payment_mode"
+                        value={zohoPaymentData.payment_mode}
+                        onChange={handleZohoInputChange}
+                        className="mt-1"
+                      >
+                        {zohoPaymentModes.map((mode) => (
+                          <option key={mode.value} value={mode.value}>
+                            {mode.label}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Reference Number</label>
+                      <Input
+                        type="text"
+                        name="reference_number"
+                        value={zohoPaymentData.reference_number}
+                        onChange={handleZohoInputChange}
+                        className="mt-1"
+                        placeholder="UTR, Cheque No, etc."
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Deposit Account ID</label>
+                      <Input
+                        type="text"
+                        name="deposit_to_account_id"
+                        value={zohoPaymentData.deposit_to_account_id}
+                        onChange={handleZohoInputChange}
+                        className="mt-1"
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea
+                      name="description"
+                      value={zohoPaymentData.description}
+                      onChange={handleZohoInputChange}
+                      rows={2}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Payment description..."
+                    />
+                  </div>
+
+                  {/* Invoice Selection */}
+                  {zohoPaymentData.clientId && (
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <label className="block text-sm font-medium text-gray-700">Select Invoices to Pay *</label>
+                        {selectedInvoicesForPayment.length > 0 && zohoPaymentData.amount && (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={distributeEvenly}
+                            className="text-xs"
+                          >
+                            Distribute Evenly
+                          </Button>
+                        )}
+                      </div>
+                      {clientInvoices.length === 0 ? (
+                        <div className="text-sm text-gray-500 p-4 border border-gray-200 rounded-md">
+                          No outstanding invoices found for this client.
+                        </div>
+                      ) : (
+                        <div className="border border-gray-200 rounded-md">
+                          <div className="max-h-60 overflow-y-auto">
+                            {clientInvoices.map((invoice) => {
+                              const isSelected = selectedInvoicesForPayment.some(inv => inv.invoiceId === invoice._id);
+                              const selectedInvoice = selectedInvoicesForPayment.find(inv => inv.invoiceId === invoice._id);
+                              const outstanding = invoice.balance || invoice.total;
+                              
+                              return (
+                                <div key={invoice._id} className="p-3 border-b border-gray-100 last:border-b-0">
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-3">
+                                      <input
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={(e) => handleInvoiceSelection(invoice._id, e.target.checked)}
+                                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                                      />
+                                      <div>
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {invoice.invoice_number || invoice.local_invoice_number}
+                                        </div>
+                                        <div className="text-xs text-gray-500">
+                                          Outstanding: ₹{outstanding.toLocaleString()}
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {isSelected && (
+                                      <div className="flex items-center space-x-2">
+                                        <span className="text-sm text-gray-500">₹</span>
+                                        <Input
+                                          type="number"
+                                          value={selectedInvoice?.amount_applied || ''}
+                                          onChange={(e) => updateInvoiceAmount(invoice._id, e.target.value)}
+                                          step="0.01"
+                                          min="0"
+                                          max={outstanding}
+                                          className="w-24 text-sm"
+                                          placeholder="Amount"
+                                        />
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {formErrors.invoices && <p className="text-red-500 text-xs mt-1">{formErrors.invoices}</p>}
+                    </div>
+                  )}
+
+                  {/* Payment Summary */}
+                  {selectedInvoicesForPayment.length > 0 && (
+                    <div className="bg-gray-50 p-4 rounded-md">
+                      <h4 className="text-sm font-medium text-gray-900 mb-2">Payment Summary</h4>
+                      <div className="space-y-1 text-sm">
+                        {selectedInvoicesForPayment.map((inv) => (
+                          <div key={inv.invoiceId} className="flex justify-between">
+                            <span className="text-gray-600">{inv.invoice_number}</span>
+                            <span className="font-medium">₹{Number(inv.amount_applied).toLocaleString()}</span>
+                          </div>
+                        ))}
+                        <div className="border-t border-gray-200 pt-2 mt-2 space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Total Allocated:</span>
+                            <span className="font-medium">₹{calculateTotalAmount().toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-gray-600">Payment Amount:</span>
+                            <span className="font-medium">₹{Number(zohoPaymentData.amount || 0).toLocaleString()}</span>
+                          </div>
+                          {Math.abs(calculateTotalAmount() - Number(zohoPaymentData.amount || 0)) > 0.01 && (
+                            <div className="flex justify-between text-red-600">
+                              <span className="text-sm">Difference:</span>
+                              <span className="text-sm font-medium">₹{Math.abs(calculateTotalAmount() - Number(zohoPaymentData.amount || 0)).toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-3 pt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowModal(false)}
+                    >
+                      Cancel
+                    </Button>
+                    <Button 
+                      type="submit" 
+                      disabled={submitting || selectedInvoicesForPayment.length === 0}
+                    >
+                      {submitting ? "Processing..." : "Record Payment in Zoho Books"}
+                    </Button>
+                  </div>
+                </form>
               ) : (
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
@@ -1156,6 +1625,7 @@ export function PaymentsPage() {
                       {submitting ? "Saving..." : 
                        modalMode === "create" ? "Create Payment" : 
                        modalMode === "draft" ? "Create Draft Transaction" : 
+                       modalMode === "zoho-payment" ? "Record Payment in Zoho Books" :
                        "Update Payment"}
                     </Button>
                   </div>

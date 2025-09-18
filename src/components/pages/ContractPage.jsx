@@ -15,7 +15,6 @@ export function ContractPage() {
     capacity: "",
     monthlyRent: "",
     initialCredits: "",
-    securityDeposit: "",
     contractStartDate: "",
     contractEndDate: "",
     terms: ""
@@ -100,9 +99,7 @@ export function ContractPage() {
       newErrors.buildingId = "Selected building has no pricing configured";
     }
     
-    if (!formData.securityDeposit.trim()) {
-      newErrors.securityDeposit = "Security deposit is required";
-    }
+    // Security deposit removed from contracts
     
     if (!formData.contractStartDate.trim()) {
       newErrors.contractStartDate = "Contract start date is required";
@@ -136,7 +133,6 @@ export function ContractPage() {
         clientId,
         buildingId: formData.buildingId,
         capacity: parseInt(formData.capacity),
-        securityDeposit: parseFloat(formData.securityDeposit),
         contractStartDate: formData.contractStartDate,
         contractEndDate: formData.contractEndDate,
         terms: formData.terms
@@ -303,16 +299,7 @@ export function ContractPage() {
                     </div>
                   )}
 
-                  <Input
-                    label="Security Deposit (₹)"
-                    name="securityDeposit"
-                    type="number"
-                    value={formData.securityDeposit}
-                    onChange={handleChange}
-                    error={errors.securityDeposit}
-                    placeholder="30000"
-                    required
-                  />
+                  {/* Security deposit field removed */}
 
                   <Input
                     label="Contract Start Date"
