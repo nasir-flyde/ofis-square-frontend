@@ -196,8 +196,9 @@ export function CreateInvoicePage() {
     const taxableBase = subtotal - discountAmount;
     
     // Calculate tax based on line items tax percentage (assuming uniform tax)
-    const taxPercentage = formData.line_items[0]?.tax_percentage || 18;
-    const taxAmount = (taxableBase * taxPercentage) / 100;
+    const taxRaw = formData.line_items[0]?.tax_percentage;
+    const taxPercentage = (taxRaw === undefined || taxRaw === null) ? 18 : Number(taxRaw);
+    const taxAmount = (taxableBase * Number(taxPercentage)) / 100;
     const total = taxableBase + taxAmount + Number(formData.shipping_charge || 0) + Number(formData.adjustment || 0);
 
     return {
@@ -253,26 +254,38 @@ export function CreateInvoicePage() {
     
     setLoading(true);
     try {
+      // Build payload expected by backend controller (invoiceController.createInvoice)
+      const taxRateRaw = formData.line_items[0]?.tax_percentage;
+      const taxRate = (taxRateRaw === undefined || taxRateRaw === null) ? 18 : Number(taxRateRaw);
       const payload = {
-        ...formData,
-        line_items: formData.line_items.map(item => ({
-          ...item,
+        client: formData.client,
+        contract: formData.contract || undefined,
+        building: formData.building || undefined,
+        cabin: formData.cabin || undefined,
+        billingPeriod: {
+          start: formData.billing_period.start,
+          end: formData.billing_period.end,
+        },
+        issueDate: formData.date,
+        dueDate: formData.due_date,
+        items: formData.line_items.map(item => ({
+          description: item.description,
           quantity: Number(item.quantity),
           unitPrice: Number(item.unitPrice),
-          amount: Number(item.quantity) * Number(item.unitPrice),
-          rate: Number(item.unitPrice),
-          item_total: Number(item.quantity) * Number(item.unitPrice),
-          tax_percentage: Number(item.tax_percentage)
         })),
-        discount: Number(formData.discount),
-        sub_total: Number(formData.sub_total),
-        tax_total: Number(formData.tax_total),
-        total: Number(formData.total),
-        balance: Number(formData.balance),
-        shipping_charge: Number(formData.shipping_charge),
-        adjustment: Number(formData.adjustment),
-        payment_terms: Number(formData.payment_terms),
-        exchange_rate: Number(formData.exchange_rate)
+        discount: {
+          type: formData.discount_type === 'percent' ? 'percent' : 'flat',
+          value: Number(formData.discount || 0)
+        },
+        taxes: [
+          {
+            name: 'GST',
+            rate: Number(taxRate)
+          }
+        ],
+        amountPaid: Number(formData.amount_paid || 0),
+        notes: formData.notes || 'Manual invoice creation',
+        status: formData.status || 'draft'
       };
 
       const { data } = await api.post('/api/invoices', payload);
@@ -559,7 +572,7 @@ export function CreateInvoicePage() {
                   label="Tax Rate (%)"
                   type="number"
                   step="0.01"
-                  value={formData.line_items[0]?.tax_percentage || 18}
+                  value={formData.line_items[0]?.tax_percentage ?? 18}
                   onChange={(e) => {
                     const newItems = [...formData.line_items];
                     newItems.forEach(item => {
@@ -605,7 +618,7 @@ export function CreateInvoicePage() {
                     <span>₹{Number(formData.adjustment || 0).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax ({formData.line_items[0]?.tax_percentage || 18}%):</span>
+                    <span>Tax ({formData.line_items[0]?.tax_percentage ?? 18}%):</span>
                     <span>₹{totals.taxAmount}</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between font-semibold">

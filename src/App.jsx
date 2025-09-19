@@ -21,6 +21,7 @@ import { TicketsPage } from "./components/pages/TicketsPage";
 import { UsersPage } from "./components/pages/UsersPage";
 import { PaymentsPage } from "./components/pages/PaymentsPage";
 import { MembersPage } from "./components/pages/MembersPage";
+import { CreditManagementPage } from "./components/pages/CreditManagementPage";
 import { MainLayout } from "./components/layout/MainLayout";
 import ReceptionDashboard from "./components/pages/ReceptionDashboard";
 import InviteVisitor from "./components/pages/InviteVisitor";
@@ -29,7 +30,7 @@ function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/" element={<Navigate to="/auth" replace />} />
+        <Route path="/" element={<Navigate to="/details" replace />} />
         <Route path="/auth" element={<AuthPage />} />
         <Route path="/dashboard" element={
           <MainLayout>
@@ -84,6 +85,11 @@ function App() {
         <Route path="/payments" element={
           <MainLayout>
             <PaymentsPage />
+          </MainLayout>
+        } />
+        <Route path="/credits" element={
+          <MainLayout>
+            <CreditManagementPage />
           </MainLayout>
         } />
         <Route path="/visitors/reception" element={

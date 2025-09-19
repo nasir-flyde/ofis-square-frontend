@@ -24,7 +24,8 @@ export function BuildingsPage() {
     totalFloors: "",
     amenities: [],
     status: "active",
-    pricing: ""
+    pricing: "",
+    photos: []
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
@@ -85,7 +86,8 @@ export function BuildingsPage() {
       totalFloors: "",
       amenities: [],
       status: "active",
-      pricing: ""
+      pricing: "",
+      photos: []
     });
     setFormErrors({});
   };
@@ -108,7 +110,8 @@ export function BuildingsPage() {
       totalFloors: building.totalFloors || "",
       amenities: building.amenities || [],
       status: building.status || "active",
-      pricing: building.pricing || ""
+      pricing: building.pricing || "",
+      photos: []
     });
     setSelectedBuilding(building);
     setModalMode("edit");
@@ -219,6 +222,59 @@ export function BuildingsPage() {
       : [...currentAmenities, amenity];
     
     setFormData({ ...formData, amenities: updatedAmenities });
+  };
+
+  const handlePhotoUpload = (e) => {
+    const files = Array.from(e.target.files);
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    const maxFiles = 10;
+
+    if (formData.photos.length + files.length > maxFiles) {
+      setError(`Maximum ${maxFiles} photos allowed`);
+      return;
+    }
+
+    const processedFiles = [];
+    let hasError = false;
+
+    files.forEach((file) => {
+      if (file.size > maxSize) {
+        setError(`File ${file.name} is too large. Maximum size is 10MB.`);
+        hasError = true;
+        return;
+      }
+
+      if (!file.type.startsWith('image/')) {
+        setError(`File ${file.name} is not an image.`);
+        hasError = true;
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        processedFiles.push({
+          name: file.name,
+          file: event.target.result, // base64 string
+          size: file.size,
+          preview: event.target.result
+        });
+
+        if (processedFiles.length === files.length && !hasError) {
+          setFormData(prev => ({
+            ...prev,
+            photos: [...prev.photos, ...processedFiles]
+          }));
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removePhoto = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      photos: prev.photos.filter((_, i) => i !== index)
+    }));
   };
 
   const commonAmenities = [
@@ -483,6 +539,28 @@ export function BuildingsPage() {
                         </div>
                       </div>
                     )}
+
+                    {selectedBuilding?.photos && selectedBuilding.photos.length > 0 && (
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 mb-4">Building Photos</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                          {selectedBuilding.photos.map((photo, index) => (
+                            <div key={index} className="relative group">
+                              <img
+                                src={photo.url}
+                                alt={photo.name}
+                                className="w-full h-32 object-cover rounded-lg border border-gray-300 cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => window.open(photo.url, '_blank')}
+                              />
+                              <div className="absolute bottom-0 left-0 right-0 bg-black bg-opacity-50 text-white text-xs p-2 rounded-b-lg opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="truncate">{photo.name}</div>
+                                <div>{(photo.size / 1024 / 1024).toFixed(2)} MB</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-6">
@@ -641,6 +719,59 @@ export function BuildingsPage() {
                             <span className="text-sm text-gray-700">{amenity}</span>
                           </label>
                         ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-3">
+                        Building Photos
+                      </label>
+                      <div className="space-y-4">
+                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                          <input
+                            type="file"
+                            multiple
+                            accept="image/*"
+                            onChange={handlePhotoUpload}
+                            className="hidden"
+                            id="photo-upload"
+                          />
+                          <label htmlFor="photo-upload" className="cursor-pointer">
+                            <div className="text-gray-600">
+                              <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                                <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                              </svg>
+                              <div className="mt-2">
+                                <span className="text-blue-600 font-medium">Click to upload</span> or drag and drop
+                              </div>
+                              <div className="text-sm text-gray-500 mt-1">
+                                PNG, JPG, GIF up to 10MB each (Max 10 photos)
+                              </div>
+                            </div>
+                          </label>
+                        </div>
+
+                        {formData.photos.length > 0 && (
+                          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {formData.photos.map((photo, index) => (
+                              <div key={index} className="relative">
+                                <img
+                                  src={photo.preview}
+                                  alt={photo.name}
+                                  className="w-full h-24 object-cover rounded-lg border border-gray-300"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => removePhoto(index)}
+                                  className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                                >
+                                  ×
+                                </button>
+                                <div className="text-xs text-gray-500 mt-1 truncate">{photo.name}</div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
 

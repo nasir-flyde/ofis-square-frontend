@@ -5,7 +5,7 @@ import { Button } from "../ui/Button";
 import { Input } from "../ui/Input";
 import { Badge } from "../ui/Badge";
 import { useApi } from "../../hooks/useApi";
-import { FileText, Download, Eye, Edit, Trash2, Building, User, Calendar, IndianRupee, Plus } from "lucide-react";
+import { FileText, Download, Eye, Edit, Trash2, Building, User, Calendar, IndianRupee, Plus, Merge, Send } from "lucide-react";
 
 export function InvoicesPage() {
   const navigate = useNavigate();
@@ -18,6 +18,25 @@ export function InvoicesPage() {
   const [error, setError] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState("view");
+  const [showConsolidateModal, setShowConsolidateModal] = useState(false);
+  const [consolidateForm, setConsolidateForm] = useState({
+    year: new Date().getFullYear(),
+    month: new Date().getMonth() + 1,
+    clientId: "",
+    sendEmail: false
+  });
+  const [consolidateLoading, setConsolidateLoading] = useState(false);
+  const [consolidationPreview, setConsolidationPreview] = useState({
+    creditBalance: 0,
+    invoiceCount: 0,
+    totalAmount: 0,
+    subTotal: 0,
+    gst: 0,
+    allocated: 0,
+    used: 0,
+    extra: 0,
+    loading: false
+  });
   const { client: api } = useApi();
 
   const fetchInvoices = async () => {
@@ -64,6 +83,13 @@ export function InvoicesPage() {
     );
     setFilteredInvoices(filtered);
   }, [searchTerm, invoices]);
+
+  // Fetch consolidation preview when form values change
+  useEffect(() => {
+    if (showConsolidateModal) {
+      fetchConsolidationPreview(consolidateForm.clientId, consolidateForm.year, consolidateForm.month);
+    }
+  }, [consolidateForm.clientId, consolidateForm.year, consolidateForm.month, showConsolidateModal]);
 
   const getStatusBadge = (status) => {
     const statusConfig = {
@@ -131,6 +157,107 @@ export function InvoicesPage() {
     } catch (err) {
       console.error("Error deleting invoice:", err);
       setError(err.response?.data?.message || "Failed to delete invoice");
+    }
+  };
+
+  const fetchConsolidationPreview = async (clientId, year, month) => {
+    if (!clientId || !year || !month) {
+      setConsolidationPreview({
+        creditBalance: 0,
+        invoiceCount: 0,
+        totalAmount: 0,
+        subTotal: 0,
+        gst: 0,
+        allocated: 0,
+        used: 0,
+        extra: 0,
+        loading: false
+      });
+      return;
+    }
+
+    try {
+      setConsolidationPreview(prev => ({ ...prev, loading: true }));
+      
+      // Fetch client credit balance and exceeded-credits preview
+      const [walletResponse, previewResponse] = await Promise.all([
+        api.get(`/api/wallet/${clientId}`),
+        api.post(`/api/credits/exceeded-invoice`, { clientId, year, month, preview: true })
+      ]);
+
+      const previewData = previewResponse?.data?.data || {};
+
+      setConsolidationPreview({
+        creditBalance: walletResponse.data.success ? walletResponse.data.data.balance : 0,
+        invoiceCount: 0,
+        totalAmount: typeof previewData.total === 'number' ? previewData.total : 0,
+        subTotal: typeof previewData.subTotal === 'number' ? previewData.subTotal : 0,
+        gst: typeof previewData.gst === 'number' ? previewData.gst : 0,
+        allocated: typeof previewData.allocated === 'number' ? previewData.allocated : 0,
+        used: typeof previewData.used === 'number' ? previewData.used : 0,
+        extra: typeof previewData.extra === 'number' ? previewData.extra : 0,
+        loading: false
+      });
+    } catch (error) {
+      console.error("Error fetching consolidation preview:", error);
+      setConsolidationPreview({
+        creditBalance: 0,
+        invoiceCount: 0,
+        totalAmount: 0,
+        subTotal: 0,
+        gst: 0,
+        allocated: 0,
+        used: 0,
+        extra: 0,
+        loading: false
+      });
+    }
+  };
+
+  const handleConsolidateInvoices = async () => {
+    if (!consolidateForm.clientId) {
+      alert("Please select a client");
+      return;
+    }
+
+    try {
+      setConsolidateLoading(true);
+      const response = await api.post("/api/credits/exceeded-invoice", {
+        year: consolidateForm.year,
+        month: consolidateForm.month,
+        clientId: consolidateForm.clientId,
+        preview: false,
+        singleInvoice: false
+      });
+
+      if (response.data.success) {
+        alert("Invoice created successfully!");
+        setShowConsolidateModal(false);
+        setConsolidateForm({
+          year: new Date().getFullYear(),
+          month: new Date().getMonth() + 1,
+          clientId: "",
+          sendEmail: false
+        });
+        setConsolidationPreview({
+          creditBalance: 0,
+          invoiceCount: 0,
+          totalAmount: 0,
+          subTotal: 0,
+          gst: 0,
+          allocated: 0,
+          used: 0,
+          extra: 0,
+          loading: false
+        });
+        // Refresh invoices list
+        fetchInvoices();
+      }
+    } catch (error) {
+      console.error("Error consolidating invoices:", error);
+      alert("Failed to consolidate invoices: " + (error.response?.data?.message || error.message));
+    } finally {
+      setConsolidateLoading(false);
     }
   };
 
@@ -222,10 +349,16 @@ export function InvoicesPage() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="primary" onClick={handleCreateNew}>
-            <Plus size={16} className="mr-2" />
-            Create New Invoice
-          </Button>
+          <div className="flex space-x-3">
+            <Button variant="outline" onClick={() => setShowConsolidateModal(true)}>
+              <Merge size={16} className="mr-2" />
+              Consolidate Invoices
+            </Button>
+            <Button variant="primary" onClick={handleCreateNew}>
+              <Plus size={16} className="mr-2" />
+              Create New Invoice
+            </Button>
+          </div>
         </div>
 
         {/* Invoices Table */}
@@ -454,6 +587,197 @@ export function InvoicesPage() {
                       <p className="text-gray-900 mt-1 whitespace-pre-wrap">{selectedInvoice.notes}</p>
                     </div>
                   )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Consolidate Invoices Modal */}
+        {showConsolidateModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg max-w-md w-full mx-4">
+              <div className="p-6 border-b border-gray-200">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Consolidate Invoices
+                  </h2>
+                  <button
+                    onClick={() => setShowConsolidateModal(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              
+              <div className="p-6">
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Client
+                    </label>
+                    <select
+                      value={consolidateForm.clientId}
+                      onChange={(e) => setConsolidateForm({...consolidateForm, clientId: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select a client</option>
+                      {clients.map((client) => (
+                        <option key={client._id} value={client._id}>
+                          {client.companyName}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Year
+                      </label>
+                      <Input
+                        type="number"
+                        value={consolidateForm.year}
+                        onChange={(e) => setConsolidateForm({...consolidateForm, year: parseInt(e.target.value)})}
+                        min="2020"
+                        max="2030"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Month
+                      </label>
+                      <select
+                        value={consolidateForm.month}
+                        onChange={(e) => setConsolidateForm({...consolidateForm, month: parseInt(e.target.value)})}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        {Array.from({length: 12}, (_, i) => (
+                          <option key={i + 1} value={i + 1}>
+                            {new Date(2024, i, 1).toLocaleString('default', { month: 'long' })}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Credit Balance and Exceeded Credits Preview */}
+                  {consolidateForm.clientId && (
+                    <div className="bg-gray-50 p-4 rounded-lg space-y-3">
+                      <h4 className="text-sm font-medium text-gray-900">Exceeded Credits Summary</h4>
+                      
+                      {consolidationPreview.loading ? (
+                        <div className="flex items-center space-x-2">
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                          <span className="text-sm text-gray-600">Loading preview...</span>
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 gap-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Credit Balance:</span>
+                            <span className={`text-sm font-medium ${consolidationPreview.creditBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                              ₹{consolidationPreview.creditBalance.toLocaleString()}
+                            </span>
+                          </div>
+                          
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Allocated Credits:</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {consolidationPreview.allocated.toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Used Credits:</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              {consolidationPreview.used.toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Exceeded Credits:</span>
+                            <span className={`text-sm font-medium ${consolidationPreview.extra > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                              {consolidationPreview.extra.toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Subtotal (INR):</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              ₹{consolidationPreview.subTotal.toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">GST (INR):</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              ₹{consolidationPreview.gst.toLocaleString()}
+                            </span>
+                          </div>
+
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm text-gray-600">Total (INR):</span>
+                            <span className="text-sm font-medium text-gray-900">
+                              ₹{consolidationPreview.totalAmount.toLocaleString()}
+                            </span>
+                          </div>
+                          
+                          {consolidationPreview.creditBalance > 0 && consolidationPreview.totalAmount > 0 && (
+                            <div className="flex justify-between items-center pt-2 border-t border-gray-200">
+                              <span className="text-sm text-gray-600">Net Amount After Credits:</span>
+                              <span className={`text-sm font-medium ${(consolidationPreview.totalAmount - consolidationPreview.creditBalance) <= 0 ? 'text-green-600' : 'text-gray-900'}`}>
+                                ₹{Math.max(0, consolidationPreview.totalAmount - consolidationPreview.creditBalance).toLocaleString()}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="sendEmail"
+                      checked={consolidateForm.sendEmail}
+                      onChange={(e) => setConsolidateForm({...consolidateForm, sendEmail: e.target.checked})}
+                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="sendEmail" className="ml-2 block text-sm text-gray-700">
+                      Send consolidated invoice via email
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowConsolidateModal(false)}
+                    disabled={consolidateLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="primary"
+                    onClick={handleConsolidateInvoices}
+                    disabled={consolidateLoading}
+                  >
+                    {consolidateLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Consolidating...
+                      </>
+                    ) : (
+                      <>
+                        <Send size={16} className="mr-2" />
+                        Consolidate
+                      </>
+                    )}
+                  </Button>
                 </div>
               </div>
             </div>

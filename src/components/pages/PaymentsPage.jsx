@@ -72,10 +72,10 @@ export function PaymentsPage() {
 
   const [selectedInvoicesForPayment, setSelectedInvoicesForPayment] = useState([]);
   const [clientInvoices, setClientInvoices] = useState([]);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const { client: api } = useApi();
 
@@ -178,7 +178,7 @@ export function PaymentsPage() {
   useEffect(() => {
     if (activeTab === "payments") {
       const filtered = payments.filter(payment =>
-        payment.invoice?.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        payment.invoice?.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payment.client?.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payment.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         payment.type?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -186,7 +186,7 @@ export function PaymentsPage() {
       setFilteredPayments(filtered);
     } else {
       const filtered = draftPayments.filter(draft =>
-        draft.invoice?.invoiceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        draft.invoice?.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         draft.client?.companyName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         draft.referenceNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         draft.type?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -208,7 +208,8 @@ export function PaymentsPage() {
       currency: "INR",
       notes: "",
       bankName: "",
-      accountNumber: ""
+      accountNumber: "",
+      screenshots: []
     });
     setFormErrors({});
     setSelectedPayment(null);
@@ -323,7 +324,8 @@ export function PaymentsPage() {
       currency: payment.currency || "INR",
       notes: payment.notes || "",
       bankName: payment.bankName || "",
-      accountNumber: payment.accountNumber || ""
+      accountNumber: payment.accountNumber || "",
+      screenshots: Array.isArray(payment.screenshots) ? payment.screenshots : []
     });
     setModalMode("edit");
     setShowModal(true);
@@ -376,6 +378,14 @@ export function PaymentsPage() {
         ...prev,
         [name]: ""
       }));
+    }
+
+    // When creating a Draft Transaction: on client change, load that client's invoices and reset selected invoice
+    if (modalMode === "draft" && name === "client") {
+      if (value) {
+        fetchClientInvoices(value);
+      }
+      setPaymentData(prev => ({ ...prev, invoice: "" }));
     }
   };
 
@@ -524,7 +534,7 @@ export function PaymentsPage() {
         setUploadedFiles(prev => [...prev, fileData]);
         setPaymentData(prev => ({
           ...prev,
-          screenshots: [...prev.screenshots, e.target.result]
+          screenshots: [ ...(prev?.screenshots || []), e.target.result ]
         }));
       };
       reader.readAsDataURL(file);
@@ -535,7 +545,7 @@ export function PaymentsPage() {
     setUploadedFiles(prev => prev.filter((_, i) => i !== index));
     setPaymentData(prev => ({
       ...prev,
-      screenshots: prev.screenshots.filter((_, i) => i !== index)
+      screenshots: (prev?.screenshots || []).filter((_, i) => i !== index)
     }));
   };
 
@@ -799,9 +809,6 @@ export function PaymentsPage() {
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Invoice
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Client
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -830,14 +837,6 @@ export function PaymentsPage() {
                 {activeTab === "payments" ? (
                   filteredPayments.map((payment) => (
                     <tr key={payment._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <FileText size={14} className="mr-2 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">
-                            {payment.invoice?.invoiceNumber || "N/A"}
-                          </span>
-                        </div>
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center text-sm text-gray-900">
                           <Building size={14} className="mr-2 text-gray-400" />
@@ -898,14 +897,6 @@ export function PaymentsPage() {
                 ) : (
                   filteredDrafts.map((draft) => (
                     <tr key={draft._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <FileText size={14} className="mr-2 text-gray-400" />
-                          <span className="text-sm font-medium text-gray-900">
-                            {draft.invoice?.invoiceNumber || "N/A"}
-                          </span>
-                        </div>
-                      </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center text-sm text-gray-900">
                           <Building size={14} className="mr-2 text-gray-400" />
@@ -1447,21 +1438,60 @@ export function PaymentsPage() {
                 <form onSubmit={handleSubmit} className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Invoice *</label>
-                      <Select
-                        name="invoice"
-                        value={paymentData.invoice}
-                        onChange={handleInputChange}
-                        className="mt-1"
-                      >
-                        <option value="">Select Invoice</option>
-                        {invoices.map((invoice) => (
-                          <option key={invoice._id} value={invoice._id}>
-                            {invoice.invoiceNumber} - ₹{invoice.total}
-                          </option>
-                        ))}
-                      </Select>
-                      {formErrors.invoice && <p className="text-red-500 text-xs mt-1">{formErrors.invoice}</p>}
+                      {modalMode === "draft" ? (
+                        <>
+                          <label className="block text-sm font-medium text-gray-700">Client *</label>
+                          <Select
+                            name="client"
+                            value={paymentData.client}
+                            onChange={handleInputChange}
+                            className="mt-1"
+                          >
+                            <option value="">Select Client</option>
+                            {clients.map((client) => (
+                              <option key={client._id} value={client._id}>
+                                {client.companyName}
+                              </option>
+                            ))}
+                          </Select>
+                          {formErrors.client && <p className="text-red-500 text-xs mt-1">{formErrors.client}</p>}
+
+                          <label className="block text-sm font-medium text-gray-700 mt-4">Invoice *</label>
+                          <Select
+                            name="invoice"
+                            value={paymentData.invoice}
+                            onChange={handleInputChange}
+                            className="mt-1"
+                            disabled={!paymentData.client}
+                          >
+                            <option value="">{paymentData.client ? "Select Invoice" : "Select a client first"}</option>
+                            {clientInvoices.map((invoice) => (
+                              <option key={invoice._id} value={invoice._id}>
+                                {(invoice.invoice_number || invoice.local_invoice_number)} - ₹{Number(invoice.total || 0).toLocaleString()}
+                              </option>
+                            ))}
+                          </Select>
+                          {formErrors.invoice && <p className="text-red-500 text-xs mt-1">{formErrors.invoice}</p>}
+                        </>
+                      ) : (
+                        <>
+                          <label className="block text-sm font-medium text-gray-700">Invoice *</label>
+                          <Select
+                            name="invoice"
+                            value={paymentData.invoice}
+                            onChange={handleInputChange}
+                            className="mt-1"
+                          >
+                            <option value="">Select Invoice</option>
+                            {invoices.map((invoice) => (
+                              <option key={invoice._id} value={invoice._id}>
+                                {(invoice.invoice_number || invoice.local_invoice_number)} - ₹{Number(invoice.total || 0).toLocaleString()}
+                              </option>
+                            ))}
+                          </Select>
+                          {formErrors.invoice && <p className="text-red-500 text-xs mt-1">{formErrors.invoice}</p>}
+                        </>
+                      )}
                     </div>
 
                     <div>

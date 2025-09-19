@@ -37,9 +37,9 @@ export function Sidebar() {
   const menuItems = [
     { 
       id: "dashboard", 
-      label: "Dashboard", 
+      label: "Details", 
       icon: <Home size={20} />, 
-      path: "/dashboard" 
+      path: "/details" 
     },
     { 
       id: "reception", 
