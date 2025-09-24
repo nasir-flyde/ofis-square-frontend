@@ -26,8 +26,6 @@ import { MainLayout } from "./components/layout/MainLayout";
 import ReceptionDashboard from "./components/pages/ReceptionDashboard";
 import InviteVisitor from "./components/pages/InviteVisitor";
 import { OnDemandAuthPage } from "./components/pages/OnDemandAuthPage";
-import { DayPassPurchasePage } from "./components/pages/DayPassPurchasePage";
-import { DayPassManagePage } from "./components/pages/DayPassManagePage";
 import { QRScannerPage } from "./components/pages/QRScannerPage";
 
 function App() {
@@ -121,13 +119,6 @@ function App() {
         <Route path="/contracts" element={
           <MainLayout>
             <ContractsPage />
-          </MainLayout>
-        } />
-        {/* Day Pass flows */}
-        <Route path="/purchase" element={<DayPassPurchasePage />} />
-        <Route path="/manage" element={
-          <MainLayout>
-            <DayPassManagePage />
           </MainLayout>
         } />
         <Route path="/scanner" element={

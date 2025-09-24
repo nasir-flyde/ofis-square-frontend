@@ -29,7 +29,7 @@ export function DashboardPage() {
 
       // Fetch all data in parallel
       const [clientRes, contractsRes, invoicesRes, paymentsRes, cabinsRes] = await Promise.all([
-        api.get(`/api/clients/${clientId}`),
+        api.get(`/api/clients/dashboard`),
         api.get(`/api/contracts?client=${clientId}`),
         api.get(`/api/invoices?client=${clientId}`),
         api.get(`/api/payments?client=${clientId}`),
