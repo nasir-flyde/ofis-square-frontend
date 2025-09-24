@@ -28,13 +28,15 @@ export function UsersPage() {
     email: "",
     phone: "",
     password: "",
-    role: ""
+    role: "",
+    buildingId: ""
   });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   
   // Roles data
   const [roles, setRoles] = useState([]);
+  const [buildings, setBuildings] = useState([]);
   
   const { client: api } = useApi();
   const limit = 20;
@@ -81,10 +83,21 @@ export function UsersPage() {
     }
   };
 
+  // Fetch buildings for dropdown
+  const fetchBuildings = async () => {
+    try {
+      const response = await api.get("/api/buildings");
+      setBuildings(response.data?.data || []);
+    } catch (err) {
+      console.error("Failed to fetch buildings:", err);
+    }
+  };
+
   // Initial data fetch
   useEffect(() => {
     fetchUsers();
     fetchRoles();
+    fetchBuildings();
   }, []);
 
   // Handle search and filter changes
@@ -128,6 +141,12 @@ export function UsersPage() {
     if (!formData.phone.trim()) errors.phone = "Phone is required";
     if (!formData.role) errors.role = "Role is required";
     if (!selectedUser && !formData.password.trim()) errors.password = "Password is required";
+    
+    // Check if role is community and buildingId is required
+    const selectedRole = roles.find(r => r._id === formData.role);
+    if (selectedRole && selectedRole.roleName === "community" && !formData.buildingId) {
+      errors.buildingId = "Building is required for community users";
+    }
     
     setFormErrors(errors);
     return Object.keys(errors).length === 0;
@@ -209,7 +228,8 @@ export function UsersPage() {
       email: "",
       phone: "",
       password: "",
-      role: ""
+      role: "",
+      buildingId: ""
     });
     setFormErrors({});
     setSelectedUser(null);
@@ -222,7 +242,8 @@ export function UsersPage() {
       email: user.email,
       phone: user.phone,
       password: "",
-      role: user.role._id
+      role: user.role._id,
+      buildingId: user.buildingId?._id || ""
     });
     setShowEditModal(true);
   };
@@ -367,6 +388,9 @@ export function UsersPage() {
                     Role
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Building
+                  </th>
+                  <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Created Date
                   </th>
                   <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -377,7 +401,7 @@ export function UsersPage() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {users.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                       No users found
                     </td>
                   </tr>
@@ -397,6 +421,9 @@ export function UsersPage() {
                         <Badge variant={user.role?.roleName === 'admin' ? 'success' : 'info'}>
                           {user.role?.roleName || 'No Role'}
                         </Badge>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
+                        {user.buildingId ? user.buildingId.name : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500">
                         {new Date(user.createdAt).toLocaleDateString()}
@@ -534,6 +561,28 @@ export function UsersPage() {
                   {formErrors.role && <p className="form-error">{formErrors.role}</p>}
                 </div>
                 
+                {/* Building Selection - Only show for community role */}
+                {(() => {
+                  const selectedRole = roles.find(r => r._id === formData.role);
+                  return selectedRole && selectedRole.roleName === "community" ? (
+                    <div className="form-field">
+                      <label className="form-label">Building *</label>
+                      <Select
+                        name="buildingId"
+                        value={formData.buildingId}
+                        onChange={handleInputChange}
+                        className="h-12"
+                      >
+                        <option value="">Select Building</option>
+                        {buildings.map(building => (
+                          <option key={building._id} value={building._id}>{building.name}</option>
+                        ))}
+                      </Select>
+                      {formErrors.buildingId && <p className="form-error">{formErrors.buildingId}</p>}
+                    </div>
+                  ) : null;
+                })()}
+                
                 <div className="flex justify-end space-x-3 pt-4">
                   <Button
                     type="button"
@@ -609,6 +658,28 @@ export function UsersPage() {
                   </Select>
                   {formErrors.role && <p className="form-error">{formErrors.role}</p>}
                 </div>
+                
+                {/* Building Selection - Only show for community role */}
+                {(() => {
+                  const selectedRole = roles.find(r => r._id === formData.role);
+                  return selectedRole && selectedRole.roleName === "community" ? (
+                    <div className="form-field">
+                      <label className="form-label">Building *</label>
+                      <Select
+                        name="buildingId"
+                        value={formData.buildingId}
+                        onChange={handleInputChange}
+                        className="h-12"
+                      >
+                        <option value="">Select Building</option>
+                        {buildings.map(building => (
+                          <option key={building._id} value={building._id}>{building.name}</option>
+                        ))}
+                      </Select>
+                      {formErrors.buildingId && <p className="form-error">{formErrors.buildingId}</p>}
+                    </div>
+                  ) : null;
+                })()}
                 
                 <div className="flex justify-end space-x-3 pt-4">
                   <Button
@@ -688,6 +759,13 @@ export function UsersPage() {
                     </Badge>
                   </p>
                 </div>
+                {selectedUser.buildingId && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Building</label>
+                    <p className="mt-1 text-sm text-gray-900">{selectedUser.buildingId.name}</p>
+                    <p className="mt-1 text-xs text-gray-500">{selectedUser.buildingId.address}</p>
+                  </div>
+                )}
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Created At</label>
                   <p className="mt-1 text-sm text-gray-900">

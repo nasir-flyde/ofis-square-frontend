@@ -25,6 +25,10 @@ import { CreditManagementPage } from "./components/pages/CreditManagementPage";
 import { MainLayout } from "./components/layout/MainLayout";
 import ReceptionDashboard from "./components/pages/ReceptionDashboard";
 import InviteVisitor from "./components/pages/InviteVisitor";
+import { OnDemandAuthPage } from "./components/pages/OnDemandAuthPage";
+import { DayPassPurchasePage } from "./components/pages/DayPassPurchasePage";
+import { DayPassManagePage } from "./components/pages/DayPassManagePage";
+import { QRScannerPage } from "./components/pages/QRScannerPage";
 
 function App() {
   return (
@@ -32,6 +36,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/details" replace />} />
         <Route path="/auth" element={<AuthPage />} />
+        {/* Day Pass public auth */}
+        <Route path="/ondemand" element={<OnDemandAuthPage />} />
         <Route path="/dashboard" element={
           <MainLayout>
             <DashboardPage />
@@ -115,6 +121,18 @@ function App() {
         <Route path="/contracts" element={
           <MainLayout>
             <ContractsPage />
+          </MainLayout>
+        } />
+        {/* Day Pass flows */}
+        <Route path="/purchase" element={<DayPassPurchasePage />} />
+        <Route path="/manage" element={
+          <MainLayout>
+            <DayPassManagePage />
+          </MainLayout>
+        } />
+        <Route path="/scanner" element={
+          <MainLayout>
+            <QRScannerPage />
           </MainLayout>
         } />
         <Route path="/reports" element={
