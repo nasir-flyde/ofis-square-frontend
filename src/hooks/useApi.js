@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import axios from "axios";
 
 export function useApi(baseUrl = "https://ofis-square-backend.onrender.com") {
-// export function useApi(baseUrl = "http://localhost:5001") {
+//export function useApi(baseUrl = "http://localhost:5001") {
   const [token, setToken] = useState(localStorage.getItem("ofis_admin_token") || "");
 
   const client = useMemo(() => {
@@ -45,5 +45,20 @@ export function useApi(baseUrl = "https://ofis-square-backend.onrender.com") {
     }
   };
 
-  return { client, token, saveToken };
+  const request = async (url, options = {}) => {
+    try {
+      const response = await client({
+        url,
+        method: options.method || 'GET',
+        data: options.data,
+        params: options.params,
+        ...options
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error;
+    }
+  };
+
+  return { client, token, saveToken, request };
 }
