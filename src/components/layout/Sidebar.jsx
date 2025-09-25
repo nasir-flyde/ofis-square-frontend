@@ -16,7 +16,8 @@ import {
   Ticket,
   CreditCard,
   QrCode,
-  UserCheck
+  UserCheck,
+  Activity
 } from "lucide-react";
 
 export function Sidebar() {
@@ -72,6 +73,12 @@ export function Sidebar() {
       icon: <Calendar size={20} />, 
       path: "/meeting-rooms" 
     },
+    { 
+      id: "events", 
+      label: "Events", 
+      icon: <Calendar size={20} />, 
+      path: "/events" 
+    },
 
     { 
       id: "buildings", 
@@ -108,6 +115,12 @@ export function Sidebar() {
       label: "Users", 
       icon: <User size={20} />, 
       path: "/users" 
+    },
+    { 
+      id: "activity-logs", 
+      label: "Activity Logs", 
+      icon: <Activity size={20} />, 
+      path: "/activity-logs" 
     },
     { 
       id: "settings", 

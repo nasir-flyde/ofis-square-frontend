@@ -59,10 +59,11 @@ export function TicketsPage() {
       setLoading(true);
       setError(null);
       const response = await api.get("/api/tickets");
+      console.log('Tickets API Response:', response.data);
       
-      if (response.data.tickets) {
-        setTickets(response.data.tickets);
-        setFilteredTickets(response.data.tickets);
+      if (response.data.success && response.data.data) {
+        setTickets(response.data.data);
+        setFilteredTickets(response.data.data);
       } else {
         setError("Failed to fetch tickets");
       }

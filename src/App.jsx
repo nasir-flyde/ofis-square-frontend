@@ -22,6 +22,8 @@ import { UsersPage } from "./components/pages/UsersPage";
 import { PaymentsPage } from "./components/pages/PaymentsPage";
 import { MembersPage } from "./components/pages/MembersPage";
 import { CreditManagementPage } from "./components/pages/CreditManagementPage";
+import { ActivityLogsPage } from "./components/pages/ActivityLogsPage";
+import { EventsPage } from "./components/pages/EventsPage";
 import { MainLayout } from "./components/layout/MainLayout";
 import ReceptionDashboard from "./components/pages/ReceptionDashboard";
 import InviteVisitor from "./components/pages/InviteVisitor";
@@ -69,6 +71,11 @@ function App() {
         <Route path="/meeting-rooms" element={
           <MainLayout>
             <MeetingRoomsPage />
+          </MainLayout>
+        } />
+        <Route path="/events" element={
+          <MainLayout>
+            <EventsPage />
           </MainLayout>
         } />
         <Route path="/users" element={
@@ -124,6 +131,11 @@ function App() {
         <Route path="/scanner" element={
           <MainLayout>
             <QRScannerPage />
+          </MainLayout>
+        } />
+        <Route path="/activity-logs" element={
+          <MainLayout>
+            <ActivityLogsPage />
           </MainLayout>
         } />
         <Route path="/reports" element={

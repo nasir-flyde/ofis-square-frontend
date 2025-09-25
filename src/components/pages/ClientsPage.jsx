@@ -19,6 +19,8 @@ export function ClientsPage() {
   const [error, setError] = useState(null);
   const [editSubmitting, setEditSubmitting] = useState(false);
   const [editError, setEditError] = useState("");
+  const [editSuccess, setEditSuccess] = useState("");
+  const [globalSuccess, setGlobalSuccess] = useState("");
   const { client: api } = useApi();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
@@ -246,17 +248,20 @@ export function ClientsPage() {
       kycRejectionReason: client.kycRejectionReason || ""
     });
     setEditError("");
+    setEditSuccess("");
     setShowEditModal(true);
   };
 
   const handleCloseEditModal = () => {
     setShowEditModal(false);
     setEditError("");
+    setEditSuccess("");
   };
 
   const handleUpdateClient = async (e) => {
     e.preventDefault();
     setEditError("");
+    setEditSuccess("");
     setEditSubmitting(true);
 
     try {
@@ -274,9 +279,11 @@ export function ClientsPage() {
         
         // Close the modal
         setShowEditModal(false);
-        
-        // Optionally show success message
-        console.log("Client updated successfully");
+
+        // Show success message in green
+        setGlobalSuccess("Client updated successfully");
+        // Auto-hide after 3 seconds
+        setTimeout(() => setGlobalSuccess("") , 3000);
       } else {
         setEditError(response.data.message || "Failed to update client");
       }
@@ -533,6 +540,13 @@ export function ClientsPage() {
   return (
     <div className="p-6">
       <div className="max-w-7xl mx-auto">
+        {globalSuccess && (
+          <div className="mb-4">
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <p className="text-sm text-green-700">{globalSuccess}</p>
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Clients</h1>
