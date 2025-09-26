@@ -341,58 +341,58 @@ export function ActivityLogsPage() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Action</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">User</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Entity</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Description</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Status</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Time</th>
-                  <th className="text-left py-3 px-4 font-medium text-gray-900">Actions</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">Action</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">User</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">Entity</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">Description</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">Status</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">Time</th>
+                  <th className="text-left py-2 px-3 font-medium text-gray-900">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {filteredLogs.map((log) => (
                   <tr key={log._id} className="border-b border-gray-100 hover:bg-gray-50">
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       <div className="flex items-center gap-2">
                         {getActionIcon(log.action)}
-                        <span className="font-medium text-gray-900">{log.action}</span>
+                        <span className="font-medium text-gray-900 text-sm">{log.action}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       <div>
-                        <p className="font-medium text-gray-900">{log.userName}</p>
-                        <p className="text-sm text-gray-600">{log.userRole}</p>
+                        <p className="font-medium text-gray-900 text-sm">{log.userName}</p>
+                        <p className="text-xs text-gray-600">{log.userRole}</p>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       <div className="flex items-center gap-2">
                         {getEntityIcon(log.entity)}
-                        <span className="text-gray-900">{log.entity}</span>
+                        <span className="text-gray-900 text-sm">{log.entity}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
-                      <p className="text-gray-900 max-w-xs truncate" title={log.description}>
+                    <td className="py-2 px-3">
+                      <p className="text-gray-900 text-sm max-w-xs truncate" title={log.description}>
                         {log.description}
                       </p>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       {getStatusBadge(log.status)}
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       <div className="flex items-center gap-1 text-gray-600">
-                        <Clock className="w-4 h-4" />
-                        <span className="text-sm">{formatDate(log.createdAt)}</span>
+                        <Clock className="w-3 h-3" />
+                        <span className="text-xs">{formatDate(log.createdAt)}</span>
                       </div>
                     </td>
-                    <td className="py-3 px-4">
+                    <td className="py-2 px-3">
                       <Button
                         variant="ghost"
                         size="sm"
-                        icon={<Eye className="w-4 h-4" />}
+                        icon={<Eye className="w-3 h-3" />}
                         onClick={() => viewLogDetails(log)}
                       >
-                        View
+                        <span className="text-xs">View</span>
                       </Button>
                     </td>
                   </tr>

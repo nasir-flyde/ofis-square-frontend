@@ -23,6 +23,7 @@ import { PaymentsPage } from "./components/pages/PaymentsPage";
 import { MembersPage } from "./components/pages/MembersPage";
 import { CreditManagementPage } from "./components/pages/CreditManagementPage";
 import { ActivityLogsPage } from "./components/pages/ActivityLogsPage";
+import { ApiLogsPage } from "./components/pages/ApiLogsPage";
 import { EventsPage } from "./components/pages/EventsPage";
 import { MainLayout } from "./components/layout/MainLayout";
 import ReceptionDashboard from "./components/pages/ReceptionDashboard";
@@ -136,6 +137,11 @@ function App() {
         <Route path="/activity-logs" element={
           <MainLayout>
             <ActivityLogsPage />
+          </MainLayout>
+        } />
+        <Route path="/api-logs" element={
+          <MainLayout>
+            <ApiLogsPage />
           </MainLayout>
         } />
         <Route path="/reports" element={

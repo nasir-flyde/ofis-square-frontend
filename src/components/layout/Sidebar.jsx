@@ -17,7 +17,8 @@ import {
   CreditCard,
   QrCode,
   UserCheck,
-  Activity
+  Activity,
+  Database
 } from "lucide-react";
 
 export function Sidebar() {
@@ -123,17 +124,23 @@ export function Sidebar() {
       path: "/activity-logs" 
     },
     { 
-      id: "settings", 
-      label: "Settings", 
-      icon: <Settings size={20} />, 
-      path: "/settings" 
-    },
-    { 
-      id: "reports", 
-      label: "Reports", 
-      icon: <BarChart3 size={20} />, 
-      path: "/reports" 
+      id: "api-logs", 
+      label: "API Logs", 
+      icon: <Database size={20} />, 
+      path: "/api-logs" 
     }
+    // { 
+    //   id: "settings", 
+    //   label: "Settings", 
+    //   icon: <Settings size={20} />, 
+    //   path: "/settings" 
+    // },
+    // { 
+    //   id: "reports", 
+    //   label: "Reports", 
+    //   icon: <BarChart3 size={20} />, 
+    //   path: "/reports" 
+    // }
   ];
 
   const handleNavigation = (path, id) => {

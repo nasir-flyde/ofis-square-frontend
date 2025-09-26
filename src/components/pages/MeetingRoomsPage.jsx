@@ -45,20 +45,43 @@ export function MeetingRoomsPage() {
   const [bookingData, setBookingData] = useState({
     clientId: "",
     member: "",
-    title: "",
-    description: "",
+    visitors: [],
     start: "",
     end: "",
-    attendeesCount: "1",
-    amenitiesRequested: [],
     paymentMethod: "credits",
     amount: "",
     currency: "INR",
     notes: ""
   });
+  const [showVisitorModal, setShowVisitorModal] = useState(false);
+  const [currentVisitor, setCurrentVisitor] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    company: ""
+  });
   const [formErrors, setFormErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const { client: api } = useApi();
+
+  // Helper function to format date for datetime-local input in IST
+  const formatDateForInput = (date) => {
+    if (!date) return "";
+    const istDate = new Date(date);
+    // Convert to IST (UTC+5:30)
+    const istOffset = 5.5 * 60 * 60 * 1000; // 5.5 hours in milliseconds
+    const localISTTime = new Date(istDate.getTime() + istOffset);
+    return localISTTime.toISOString().slice(0, 16);
+  };
+
+  // Helper function to convert datetime-local input to IST Date
+  const parseInputDate = (dateString) => {
+    if (!dateString) return null;
+    // datetime-local gives us YYYY-MM-DDTHH:MM format
+    // We need to treat this as IST time
+    const date = new Date(dateString);
+    return date;
+  };
 
   const fetchMeetingRooms = async () => {
     try {
@@ -172,14 +195,12 @@ export function MeetingRoomsPage() {
       amenities: [],
       status: "active",
       pricing: {
-        hourlyRate: "",
         dailyRate: ""
       },
       availability: {
         daysOfWeek: [1, 2, 3, 4, 5],
         openTime: "09:00",
         closeTime: "19:00",
-        bufferMinutes: "15",
         minBookingMinutes: "30",
         maxBookingMinutes: "480"
       }
@@ -191,12 +212,9 @@ export function MeetingRoomsPage() {
     setBookingData({
       clientId: "",
       member: "",
-      title: "",
-      description: "",
+      visitors: [],
       start: "",
       end: "",
-      attendeesCount: "1",
-      amenitiesRequested: [],
       paymentMethod: "credits",
       amount: "",
       currency: "INR",
@@ -204,6 +222,59 @@ export function MeetingRoomsPage() {
     });
     setFormErrors({});
     setMembers([]);
+  };
+
+  const handlePaymentMethodChange = (method) => {
+    let updatedData = { ...bookingData, paymentMethod: method };
+    
+    // Auto-fetch daily rate when cash is selected
+    if (method === 'cash' && selectedRoom?.pricing?.dailyRate) {
+      updatedData.amount = selectedRoom.pricing.dailyRate.toString();
+    } else if (method !== 'cash') {
+      updatedData.amount = "";
+    }
+    
+    setBookingData(updatedData);
+  };
+
+  const handleAddVisitor = () => {
+    setCurrentVisitor({ name: "", email: "", phone: "", company: "" });
+    setShowVisitorModal(true);
+  };
+
+  const handleSaveVisitor = async () => {
+    if (!currentVisitor.name.trim()) {
+      setError("Visitor name is required");
+      return;
+    }
+
+    try {
+      // Create visitor via API with expected visit date from booking start time
+      const visitorData = {
+        ...currentVisitor,
+        expectedVisitDate: bookingData.start ? new Date(bookingData.start).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]
+      };
+      
+      const response = await api.post("/api/visitors", visitorData);
+      if (response.data.success) {
+        const newVisitor = response.data.data;
+        setBookingData({
+          ...bookingData,
+          visitors: [...bookingData.visitors, newVisitor._id]
+        });
+        setShowVisitorModal(false);
+        setCurrentVisitor({ name: "", email: "", phone: "", company: "" });
+      }
+    } catch (err) {
+      setError("Failed to create visitor");
+    }
+  };
+
+  const handleRemoveVisitor = (visitorId) => {
+    setBookingData({
+      ...bookingData,
+      visitors: bookingData.visitors.filter(id => id !== visitorId)
+    });
   };
 
   const handleCreate = () => {
@@ -221,14 +292,12 @@ export function MeetingRoomsPage() {
       amenities: room.amenities || [],
       status: room.status || "active",
       pricing: {
-        hourlyRate: room.pricing?.hourlyRate || "",
         dailyRate: room.pricing?.dailyRate || ""
       },
       availability: {
         daysOfWeek: room.availability?.daysOfWeek || [1, 2, 3, 4, 5],
         openTime: room.availability?.openTime || "09:00",
         closeTime: room.availability?.closeTime || "19:00",
-        bufferMinutes: room.availability?.bufferMinutes || "15",
         minBookingMinutes: room.availability?.minBookingMinutes || "30",
         maxBookingMinutes: room.availability?.maxBookingMinutes || "480"
       }
@@ -287,9 +356,6 @@ export function MeetingRoomsPage() {
       errors.capacity = "Capacity must be a positive number";
     }
 
-    if (formData.pricing.hourlyRate && (isNaN(formData.pricing.hourlyRate) || formData.pricing.hourlyRate < 0)) {
-      errors.hourlyRate = "Hourly rate must be a positive number";
-    }
 
     if (formData.pricing.dailyRate && (isNaN(formData.pricing.dailyRate) || formData.pricing.dailyRate < 0)) {
       errors.dailyRate = "Daily rate must be a positive number";
@@ -306,9 +372,6 @@ export function MeetingRoomsPage() {
       errors.clientId = "Client is required";
     }
     
-    if (!bookingData.title.trim()) {
-      errors.title = "Meeting title is required";
-    }
     
     if (!bookingData.start) {
       errors.start = "Start time is required";
@@ -322,9 +385,6 @@ export function MeetingRoomsPage() {
       errors.end = "End time must be after start time";
     }
 
-    if (!bookingData.attendeesCount || isNaN(bookingData.attendeesCount) || bookingData.attendeesCount < 1) {
-      errors.attendeesCount = "Attendees count must be a positive number";
-    }
 
     if (bookingData.paymentMethod === 'cash' && bookingData.amount && (isNaN(bookingData.amount) || bookingData.amount < 0)) {
       errors.amount = "Amount must be a positive number";
@@ -349,12 +409,10 @@ export function MeetingRoomsPage() {
         ...formData,
         capacity: parseInt(formData.capacity),
         pricing: {
-          hourlyRate: formData.pricing.hourlyRate ? parseFloat(formData.pricing.hourlyRate) : undefined,
           dailyRate: formData.pricing.dailyRate ? parseFloat(formData.pricing.dailyRate) : undefined
         },
         availability: {
           ...formData.availability,
-          bufferMinutes: parseInt(formData.availability.bufferMinutes),
           minBookingMinutes: parseInt(formData.availability.minBookingMinutes),
           maxBookingMinutes: parseInt(formData.availability.maxBookingMinutes)
         }
@@ -395,12 +453,9 @@ export function MeetingRoomsPage() {
       const payload = {
         room: selectedRoom._id,
         clientId: bookingData.clientId,
-        member: bookingData.member || undefined,
-        title: bookingData.title,
-        description: bookingData.description,
+        visitors: Array.isArray(bookingData.visitors) ? bookingData.visitors : undefined,
         start: bookingData.start,
         end: bookingData.end,
-        attendeesCount: parseInt(bookingData.attendeesCount),
         amenitiesRequested: bookingData.amenitiesRequested,
         paymentMethod: bookingData.paymentMethod,
         amount: bookingData.amount ? parseFloat(bookingData.amount) : undefined,
@@ -623,12 +678,7 @@ export function MeetingRoomsPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <div>
-                        {room.pricing?.hourlyRate ? `₹${room.pricing.hourlyRate}/hr` : "N/A"}
-                        {room.pricing?.dailyRate && (
-                          <div className="text-xs text-gray-500">
-                            ₹{room.pricing.dailyRate}/day
-                          </div>
-                        )}
+                        {room.pricing?.dailyRate ? `₹${room.pricing.dailyRate}/day` : "N/A"}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
@@ -939,20 +989,6 @@ export function MeetingRoomsPage() {
                             />
                           </div>
 
-                          <div>
-                            <label className="block text-sm font-medium text-gray-600 mb-1">
-                              Buffer (mins)
-                            </label>
-                            <Input
-                              type="number"
-                              value={formData.availability.bufferMinutes}
-                              onChange={(e) => setFormData({ 
-                                ...formData, 
-                                availability: { ...formData.availability, bufferMinutes: e.target.value }
-                              })}
-                              min="0"
-                            />
-                          </div>
 
                           <div>
                             <label className="block text-sm font-medium text-gray-600 mb-1">
@@ -1081,8 +1117,8 @@ export function MeetingRoomsPage() {
                       </label>
                       <select
                         value={bookingData.paymentMethod}
-                        onChange={(e) => setBookingData({ ...bookingData, paymentMethod: e.target.value })}
-                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${formErrors.paymentMethod ? "border-red-300" : "border-gray-300"}`}
+                        onChange={(e) => handlePaymentMethodChange(e.target.value)}
+                        className={`w-full px-3 py-2 border ${formErrors.paymentMethod ? "border-red-300" : "border-gray-300"} rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent`}
                       >
                         <option value="credits">Credits</option>
                         <option value="cash">Cash</option>
@@ -1114,40 +1150,6 @@ export function MeetingRoomsPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Meeting Title *
-                      </label>
-                      <Input
-                        value={bookingData.title}
-                        onChange={(e) => setBookingData({ ...bookingData, title: e.target.value })}
-                        placeholder="Enter meeting title"
-                        className={formErrors.title ? "border-red-300" : ""}
-                      />
-                      {formErrors.title && (
-                        <p className="text-sm text-red-600 mt-1">{formErrors.title}</p>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Attendees Count *
-                      </label>
-                      <Input
-                        type="number"
-                        value={bookingData.attendeesCount}
-                        onChange={(e) => setBookingData({ ...bookingData, attendeesCount: e.target.value })}
-                        placeholder="Number of attendees"
-                        min="1"
-                        max={selectedRoom?.capacity}
-                        className={formErrors.attendeesCount ? "border-red-300" : ""}
-                      />
-                      {formErrors.attendeesCount && (
-                        <p className="text-sm text-red-600 mt-1">{formErrors.attendeesCount}</p>
-                      )}
-                    </div>
-                  </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
@@ -1159,6 +1161,7 @@ export function MeetingRoomsPage() {
                         value={bookingData.start}
                         onChange={(e) => setBookingData({ ...bookingData, start: e.target.value })}
                         className={formErrors.start ? "border-red-300" : ""}
+                        title="Select date and time (IST timezone)"
                       />
                       {formErrors.start && (
                         <p className="text-sm text-red-600 mt-1">{formErrors.start}</p>
@@ -1174,6 +1177,7 @@ export function MeetingRoomsPage() {
                         value={bookingData.end}
                         onChange={(e) => setBookingData({ ...bookingData, end: e.target.value })}
                         className={formErrors.end ? "border-red-300" : ""}
+                        title="Select date and time (IST timezone)"
                       />
                       {formErrors.end && (
                         <p className="text-sm text-red-600 mt-1">{formErrors.end}</p>
@@ -1181,39 +1185,40 @@ export function MeetingRoomsPage() {
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Description
-                    </label>
-                    <textarea
-                      value={bookingData.description}
-                      onChange={(e) => setBookingData({ ...bookingData, description: e.target.value })}
-                      placeholder="Meeting description (optional)"
-                      rows={3}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
 
-                  {selectedRoom?.amenities && selectedRoom.amenities.length > 0 && (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Required Amenities
-                      </label>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                        {selectedRoom.amenities.map((amenity) => (
-                          <label key={amenity} className="flex items-center space-x-2">
-                            <input
-                              type="checkbox"
-                              checked={bookingData.amenitiesRequested.includes(amenity)}
-                              onChange={() => handleBookingAmenityChange(amenity)}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-700">{amenity}</span>
-                          </label>
-                        ))}
-                      </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">
+                      Visitors
+                    </label>
+                    <div className="space-y-3">
+                      {bookingData.visitors.length > 0 && (
+                        <div className="space-y-2">
+                          {bookingData.visitors.map((visitorId, index) => (
+                            <div key={index} className="flex items-center justify-between bg-gray-50 p-3 rounded-md">
+                              <span className="text-sm text-gray-700">Visitor {index + 1}</span>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRemoveVisitor(visitorId)}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                Remove
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleAddVisitor}
+                        className="w-full"
+                      >
+                        Add Visitor
+                      </Button>
                     </div>
-                  )}
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -1306,13 +1311,8 @@ export function MeetingRoomsPage() {
                             <td className="px-6 py-4 whitespace-nowrap">
                               <div>
                                 <div className="text-sm font-medium text-gray-900">
-                                  {booking.title || "Meeting"}
+                                  Meeting
                                 </div>
-                                {booking.description && (
-                                  <div className="text-sm text-gray-500 max-w-xs truncate">
-                                    {booking.description}
-                                  </div>
-                                )}
                               </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap">
@@ -1395,6 +1395,94 @@ export function MeetingRoomsPage() {
                     </table>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Visitor Modal */}
+        {showVisitorModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Add Visitor</h3>
+                <button
+                  onClick={() => setShowVisitorModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  ✕
+                </button>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Name *
+                  </label>
+                  <Input
+                    type="text"
+                    value={currentVisitor.name || ""}
+                    onChange={(e) => setCurrentVisitor({ ...currentVisitor, name: e.target.value })}
+                    placeholder="Enter visitor name"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <Input
+                    type="email"
+                    value={currentVisitor.email || ""}
+                    onChange={(e) => setCurrentVisitor({ ...currentVisitor, email: e.target.value })}
+                    placeholder="Enter email address"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone
+                  </label>
+                  <Input
+                    type="tel"
+                    value={currentVisitor.phone || ""}
+                    onChange={(e) => setCurrentVisitor({ ...currentVisitor, phone: e.target.value })}
+                    placeholder="Enter phone number"
+                    className="w-full"
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company
+                  </label>
+                  <Input
+                    type="text"
+                    value={currentVisitor.company || ""}
+                    onChange={(e) => setCurrentVisitor({ ...currentVisitor, company: e.target.value })}
+                    placeholder="Enter company name"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowVisitorModal(false)}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSaveVisitor}
+                  disabled={!currentVisitor.name.trim()}
+                >
+                  Add Visitor
+                </Button>
               </div>
             </div>
           </div>
